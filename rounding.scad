@@ -2191,6 +2191,105 @@ module convex_offset_extrude(
         }
 }
 
+module conditional_zflip_z(condition, z=0) {
+  if (condition)
+    scale([1,1,-1]) translate([0,0,-z]) children();
+  else children();
+}
+
+module conditional_offset(condition, delta) {
+  if (condition)
+    offset(delta=delta) children();
+  else children();
+}
+
+// generates an extrusion from z=0 cropped at z=rise.
+// extrusion tapers inward with positive run and outward with negative run
+module roofrr(rise=1, run=1, s=100, convexity=10) {
+  assert(rise != 0, "rise can not be zero.")
+  assert(s != 0, "s can not be zero.")
+  if (run) {
+    conditional_zflip_z(run<0, z=rise)
+    difference() {
+      scale([1,1,rise/abs(run)]) roof(convexity=convexity) conditional_offset(run<0, delta=-run) children();
+      translate([0,0,rise>0 ? rise+s*0.5 : rise-s*0.5]) cube([s,s,s], center=true);
+    }
+  }
+  else {
+    conditional_zflip_z(rise<0) linear_extrude(height=abs(rise), convexity=convexity) children();
+  }
+}
+
+module offset_extrude(
+  height,
+  bottom=[],
+  top=[],
+  h, l, length,
+  offset="round", r=0, steps=16,
+  extra=0,
+  cut=undef, chamfer_width=undef, chamfer_height=undef,
+  joint=undef, k=0.75, angle=45,
+  convexity=10, thickness = 1/1024, s=100
+) {
+  req_children($children);
+  argspec = [
+    ["for", ""],
+    ["r",r],
+    ["extra",extra],
+    ["type","circle"],
+    ["steps",steps],
+    ["offset",offset],
+    ["chamfer_width",chamfer_width],
+    ["chamfer_height",chamfer_height],
+    ["angle",angle],
+    ["cut",cut],
+    ["joint",joint],
+    ["k", k],
+    ["points", []],
+  ];
+  top = struct_set(argspec, top, grow=false);
+  bottom = struct_set(argspec, bottom, grow=false);
+
+  offsets_bot = _rounding_offsets(bottom, -1);
+  offsets_top = _rounding_offsets(top, 1);
+
+  // "Extra" height enlarges the result beyond the requested height, so subtract it
+  bottom_height = len(offsets_bot)==0 ? 0 : abs(last(offsets_bot)[1]) - struct_val(bottom,"extra");
+  top_height = len(offsets_top)==0 ? 0 : abs(last(offsets_top)[1]) - struct_val(top,"extra");
+
+  height = one_defined([l,h,height,length], "l,h,height,length", dflt=u_add(bottom_height,top_height));
+  middle = height-bottom_height-top_height;
+  check =
+  assert(height>=0, "Height must be nonnegative")
+  assert(middle>=0, str(
+    "Specified end treatments (bottom height = ",bottom_height,
+                        " top_height = ",top_height,") are too large for extrusion height (",height,")"
+  )
+  );
+  // The entry r[i] is [radius,z] for a given layer
+  r = move([0,bottom_height],p=concat(
+    reverse(offsets_bot), [[0,0], [0,middle]], move([0,middle], p=offsets_top)));
+  dochamfer = offset=="chamfer";
+  attachable(){
+    last = len(r)-2;
+    for(i=[0:last]) {
+      overlap = /* i<last ? thickness : */ 0;
+      for(j=[0:$children-1]) {
+        run = r[i][0] - r[i+1][0];
+        rise = r[i+1][1] - r[i][1];
+        up(r[i][1]) // +layers[i][0]
+        roofrr(rise=rise+overlap, run=run, s=s, convexity=convexity)
+        if (offset=="round")
+          offset(r=r[i][0])
+          children(j);
+        else
+          offset(delta=r[i][0],chamfer = dochamfer)
+          children(j);
+      }
+    }
+    union();
+  }
+}
 
 
 function _remove_undefined_vals(list) =
