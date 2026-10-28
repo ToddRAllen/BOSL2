@@ -572,6 +572,7 @@ module trapezoidal_threaded_rod(
     bevel,bevel1,bevel2,
     starts=1, 
     internal=false,
+    pitch_slop=0,
     d1, d2, length, h, height,
     blunt_start, blunt_start1, blunt_start2,
     lead_in, lead_in1, lead_in2,
@@ -591,8 +592,8 @@ module trapezoidal_threaded_rod(
     pa_delta = 0.5*depth*tan(thread_angle/2) / pitch;
     dummy2 = assert(pa_delta<=1/4, "\nSpecified thread geometry is impossible.");
     rr1 = -depth/pitch;
-    z1 = 1/4-pa_delta;
-    z2 = 1/4+pa_delta;
+    z1 = 1/4-pa_delta + pitch_slop*0.25;
+    z2 = 1/4+pa_delta + pitch_slop*0.25;
     profile = [
                [-z2, rr1],
                [-z1,  0],
