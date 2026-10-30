@@ -25,8 +25,8 @@ _BOSL2_DRAWING = is_undef(_BOSL2_STD) && (is_undef(BOSL2_NO_STD_WARNING) || !BOS
 // Topics: Paths (2D), Paths (3D), Drawing Tools
 // See Also: dashed_stroke(), offset_stroke(), path_sweep()
 // Usage:
-//   stroke(path, [width], [closed], [endcaps], [endcap_width], [endcap_length], [endcap_extent], [trim]);
-//   stroke(path, [width], [closed], [endcap1], [endcap2], [endcap_width1], [endcap_width2], [endcap_length1], [endcap_length2], [endcap_extent1], [endcap_extent2], [trim1], [trim2]);
+//   stroke(path, [width], [closed], [endcaps=], [endcap_width=], [endcap_length=], [endcap_extent=], [trim=], [align_faces=]);
+//   stroke(path, [width], [closed], [endcap1=], [endcap2=], [endcap_width1=], [endcap_width2=], [endcap_length1=], [endcap_length2=], [endcap_extent1=], [endcap_extent2=], [trim1=], [trim2=], [align_faces=]);
 // Description:
 //   Draws a 2D or 3D path with a given line width.  Joints and each endcap can be replaced with
 //   various marker shapes, and can be assigned different colors.  If passed a region instead of
@@ -35,14 +35,40 @@ _BOSL2_DRAWING = is_undef(_BOSL2_STD) && (is_undef(BOSL2_NO_STD_WARNING) || !BOS
 //   When drawing a closed path or region, there are no endcaps, so you cannot give the endcap parameters. 
 //   To facilitate debugging, stroke() accepts "paths" that have a single point.  These are drawn with
 //   the style of endcap1, but have their own scale parameter, `singleton_scale`, which defaults to 2
-//   so that singleton dots with endcap "round" are clearly visible.
+//   so that singleton dots with endcap "round" are clearly visible.  In 2D round singletons are circles;
+//   in 3D they are spheres.  An explicit "butt" singleton uses
+//   the "square" profile: a square in 2D, a cylinder in 3D, or an extruded marker
+//   when endcap_angle is specified. Setting the endcap to false suppresses the singleton marker.
 //   .
-//   In 2d the stroke module works by creating a sequence of rectangles (or trapezoids if line width varies) and
-//   filling in the gaps with rounded wedges.  This is fast and produces a good result.  In 3d the modules
-//   creates a cylinders (or cones) and fills the gaps with rounded wedges made using rotate_extrude.  This process is slow for
-//   long paths due to the 3d unions, and the faces on sequential cylinders may not line up.  In many cases, {{path_sweep()}} is
-//   a better choice, both running faster and producing superior output, when working in three dimensions. 
-// Figure(Med,NoAxes,2D,VPR=[0,0,0],VPD=255): Endcap Types
+//   In 2D, `stroke()` joins rectangles or trapezoids with round (the default) or flat wedges (`joints="round"` and
+//   `joints="square"` respectively).  In 3D it
+//   joins cylinders or cones with polygonal joint wedges.  The 3D body and spun markers
+//   share a circular facet count based on the smallest path width, rounded
+//   up to a multiple of four.  The default `joints="round"` in 3D gives a circular rounding at
+//   bends and `joints="square"` gives single facet joints.  Very short, thick segments and near reversals
+//   may give poor results.
+//   .
+//   Closed 3D paths often arrive back at the start with a twist mismatch between the
+//   facets of the stroke.  To correct for this, the segments are twisted by the smallest
+//   amount to create a clean joint taking account the number of facets.  This means a facet
+//   doesn't necessarily join back to itself.  
+//   With align_faces=true, the full twist is chosen so the faces return to themselves at the joint, 
+//   which will typically require more twist.  This option has no effect on open or 2D paths. 
+//   This also affects the orientation of joint markers.  
+//   .
+//   The `stroke()` module works by constructing a union of segments and joint wedges, which may be slow in 3D.
+//   This enables it to cleanly handle sharp corners and global self-intersections.  If your 3D path has many short
+//   segments and no extreme corners or global interseections it may be better to use {{path_sweep()}}.
+//   .
+//   This module has many parameters for tuning its behavior describe below in the argument list.
+//   Parameters begining with `dots_` provide shared settings for both joints and endcaps.  Corresponding
+//   `joint_` and `endcap_` parameters override them.  The joints and endcaps can be chosen from a list of
+//   standard shapes or you can give custom 2D polygons.
+//   .
+//   Especially with closed shapes which create twist, the stroke() may have degenerate polygons which
+//   do not export properly in STL files.  If this occurs use 3MF instead.  
+//   
+// Figure(Med,NoAxes,2D,VPR=[0,0,0],VPD=255): Joing and endcap Types
 //   cap_pairs = [
 //       ["butt",  "chisel" ],
 //       ["round", "square" ],
@@ -65,10 +91,11 @@ _BOSL2_DRAWING = is_undef(_BOSL2_STD) && (is_undef(BOSL2_NO_STD_WARNING) || !BOS
 //   }
 // Arguments:
 //   path = The path to draw along.
-//   width = The width of the line to draw.  If given as a list of widths, (one for each path point), draws the line with varying thickness to each point.
-//   closed = If true, draw an additional line from the end of the path to the start.
-//   joints  = Specifies the joint shape for each joint of the line.  If a 2D polygon is given, use that to draw custom joints.
-//   endcaps = Specifies the endcap type for both ends of the line.  If a 2D polygon is given, use that to draw custom endcaps.
+//   width = The width of the line to draw. If given as a list of widths (one for each path point), draws the line with varying thickness. Default: 1
+//   closed = If true, draw an additional line from the end of the path to the start. Default: true for regions, false for paths
+//   ---
+//   joints = Specifies the joint shape for each joint of the line: "round" and "square" give round and flat joints, respectively.  The various endcap shapes can also be given for joints.  In 2D if if a polygon is given, draw that.  In 3D if a polygon is given it is rotated or extruded based on the value of `joint_angle`.  Values of "butt" or `false` give no joint between the segments.  Default: "round"
+//   endcaps = Specifies the endcap type for both ends of the line. If a 2D polygon is given, use that to draw custom endcaps. Default: "round"
 //   endcap1 = Specifies the endcap type for the start of the line.  If a 2D polygon is given, use that to draw a custom endcap.
 //   endcap2 = Specifies the endcap type for the end of the line.  If a 2D polygon is given, use that to draw a custom endcap.
 //   dots = Specifies both the endcap and joint types with one argument.  If given `true`, sets both to "dot".  If a 2D polygon is given, uses that to draw custom dots.
@@ -87,14 +114,14 @@ _BOSL2_DRAWING = is_undef(_BOSL2_STD) && (is_undef(BOSL2_NO_STD_WARNING) || !BOS
 //   endcap_extent1 = Extents length of starting endcap, in multiples of the line width.
 //   endcap_extent2 = Extents length of ending endcap, in multiples of the line width.
 //   dots_extent = Extents length of both joints and endcaps, in multiples of the line width.
-//   joint_angle = Extra rotation given to joint shapes, in degrees.  If not given, the shapes are fully spun (for 3D lines).
-//   endcap_angle = Extra rotation given to endcaps, in degrees.  If not given, the endcaps are fully spun (for 3D lines).
-//   endcap_angle1 = Extra rotation given to a starting endcap, in degrees.  If not given, the endcap is fully spun (for 3D lines).
-//   endcap_angle2 = Extra rotation given to a ending endcap, in degrees.  If not given, the endcap is fully spun (for 3D lines).
-//   dots_angle = Extra rotation given to both joints and endcaps, in degrees.  If not given, the endcap is fully spun (for 3D lines).
-//   trim = Trim the the start and end line segments by this much, to keep them from interfering with custom endcaps.
-//   trim1 = Trim the the starting line segment by this much, to keep it from interfering with a custom endcap.
-//   trim2 = Trim the the ending line segment by this much, to keep it from interfering with a custom endcap.
+//   dots_angle = If not set, joint and endcap shapes in 2D are rotated to match the direction of the stroke and in 3D joint and endcap shapes are revolved into round surfaces, using only the right half of a specificed polygon.  If you specify a numeric value then in 2D it gives an absolute rotation angle for the polygon: all joints and endcaps will be oriented the same way independently of the direction of the stroke.  In 3D a numeric value gives a rotation applied to your polygon before the full polygon (both halves) is linearly extruded into the joint/endcap shape.  In 3D the shape is still oriented along the direction of the stroke.  Does not affect "round" or "square" joints.
+//   joint_angle = Set or override dots_angle for joints.
+//   endcap_angle = Set or override dots_angle for endcaps.
+//   endcap_angle1 = Set or override dots_angle for starting endcap.
+//   endcap_angle2 = Set or override dots_angle for ending endcap.
+//   trim = Trim both ends, in multiples of appropriate line width, to avoid interference with custom endcaps.
+//   trim1 = Trim the start, in multiples of starting line width, to avoid interference with a custom endcap.
+//   trim2 = Trim the end, in multiples of ending line width, to avoid interference with a custom endcap.
 //   color = If given, sets the color of the line segments, joints and endcap.
 //   endcap_color = If given, sets the color of both endcaps.  Overrides `color=` and `dots_color=`.
 //   endcap_color1 = If give, sets the color of the starting endcap.  Overrides `color=`, `dots_color=`,  and `endcap_color=`.
@@ -102,7 +129,8 @@ _BOSL2_DRAWING = is_undef(_BOSL2_STD) && (is_undef(BOSL2_NO_STD_WARNING) || !BOS
 //   joint_color = If given, sets the color of the joints.  Overrides `color=` and `dots_color=`.
 //   dots_color = If given, sets the color of the endcaps and joints.  Overrides `color=`.
 //   singleton_scale = Change the scale of the endcap shape drawn for singleton paths.  Default: 2.  
-//   convexity = Max number of times a line could intersect a wall of an endcap.
+//   convexity = Max number of times a line could intersect a wall of an endcap. Default: 10
+//   align_faces = For closed 3D paths, require each face to return to itself after one circuit. If false, use the cross section's rotational symmetry to minimize twist, allowing faces to cycle into one another. Setting true may require more twist. Ignored for open paths and 2D paths. Default: false
 // Example(2D): Drawing a Path
 //   path = [[0,100], [100,100], [200,0], [100,-100], [100,0]];
 //   stroke(path, width=20);
@@ -127,6 +155,9 @@ _BOSL2_DRAWING = is_undef(_BOSL2_STD) && (is_undef(BOSL2_NO_STD_WARNING) || !BOS
 //   stroke([square(40)], width=18, joints="square");
 // Example(2D): Setting `joints="butt"` does not draw any transitions, just rectangular strokes for each segment, meeting at their centers:
 //   stroke([square(40)], width=18, joints="butt");
+// Example: Flat Outside Joints on a 3D Path
+//   path = [[0,0,0], [20,0,0], [20,20,10], [0,25,5]];
+//   stroke(path, width=3, joints="square", $fn=16);
 // Example(2D): Joints and Endcaps
 //   path = [for (a=[0:30:360]) [a-180, 60*sin(a)]];
 //   stroke(path, width=8, joints="dot", endcaps="arrow2");
@@ -186,7 +217,7 @@ function stroke(
     endcap_angle,  endcap_angle1,  endcap_angle2,  joint_angle,  dots_angle,
     endcap_color,  endcap_color1,  endcap_color2,  joint_color,  dots_color, color,
     trim, trim1, trim2, singleton_scale=2,
-    convexity=10
+    convexity=10, align_faces=false
 ) = no_function("stroke");
 
 
@@ -199,7 +230,7 @@ module stroke(
     endcap_angle,  endcap_angle1,  endcap_angle2,  joint_angle,  dots_angle,
     endcap_color,  endcap_color1,  endcap_color2,  joint_color,  dots_color, color,
     trim, trim1, trim2, singleton_scale=2,
-    convexity=10
+    convexity=10, align_faces=false
 ) {
     no_children($children);
     module setcolor(clr) {
@@ -255,6 +286,7 @@ module stroke(
 
     closed = default(closed, is_region(path));
     check1 = assert(is_bool(closed))
+             assert(is_bool(align_faces), "align_faces must be boolean")
              assert(!closed || num_defined([endcaps,endcap1,endcap2])==0, "Cannot give endcap parameter(s) with closed path or region");
 
     dots = dots==true? "dot" : dots;
@@ -267,7 +299,7 @@ module stroke(
       assert(is_bool(endcap2) || is_string(endcap2) || is_path(endcap2))
       assert(is_bool(joints)  || is_string(joints)  || is_path(joints));
 
-    endcap1_dflts = _shape_defaults(endcap1);
+    endcap1_dflts = _shape_defaults(endcap1=="butt" ? "square" : endcap1);
     endcap2_dflts = _shape_defaults(endcap2);
     joint_dflts   = _shape_defaults(joints);
 
@@ -317,16 +349,17 @@ module stroke(
                    assert(is_num(width) || len(width)==len(path),
                           "width must be a number or a vector the same length as the path (or all components of a region)")];
 
-    attachable(two_d=len(path[0])==2)
+    attachable(two_d=paths!=[] && len(paths[0][0])==2)
     {
-      for (path = paths) {
-          path = deduplicate( closed? list_wrap(path) : path );
+      for (input_path = paths) {
+          wrapped_path = closed ? list_wrap(input_path) : input_path;
+          path = deduplicate(wrapped_path);
           width = is_num(width)? [for (x=path) width]
-                : closed? list_wrap(width)
+                : len(wrapped_path)>len(input_path) ? [each width, width[0]]
                 : width;
-          check4a=assert(len(width)==len(path), "path had duplicated points and width was given as a list: this is not allowd");
+          check4a=assert(len(width)==len(path), "path had duplicated points and width was given as a list: this is not allowed");
 
-          endcap_shape1 = _shape_path(endcap1, width[0], endcap_width1, endcap_length1, endcap_extent1);
+          endcap_shape1 = _shape_path(len(path)==1 && endcap1=="butt" ? "square" : endcap1, width[0], endcap_width1, endcap_length1, endcap_extent1);
           endcap_shape2 = _shape_path(endcap2, last(width), endcap_width2, endcap_length2, endcap_extent2);
 
           trim1 = width[0] * first_defined([
@@ -357,8 +390,8 @@ module stroke(
               } else {
                   // Endcap1
                   setcolor(endcap_color1) {
-                      translate(path[0]) {
-                          $fn = segs(width[0]/2);
+                      translate(path[0]) scale(singleton_scale) {
+                          $fn = segs(singleton_scale*width[0]/2);
                           if (is_undef(endcap_angle1)) {
                               rotate_extrude(convexity=convexity,angle=360) {
                                   right_half(planar=true) {
@@ -367,7 +400,7 @@ module stroke(
                               }
                           } else {
                               rotate([90,0,endcap_angle1]) {
-                                  linear_extrude(height=max(widths[0],0.001), center=true, convexity=convexity) {
+                                  linear_extrude(height=max(width[0],0.001), center=true, convexity=convexity) {
                                       polygon(endcap_shape1);
                                   }
                               }
@@ -476,122 +509,191 @@ module stroke(
                     }
                   }
               } else {  // Three dimensional case
-                  rotmats = cumprod([
-                      for (i = idx(path2,e=-2)) let(
-                          vec1 = i==0? UP : unit(path2[i]-path2[i-1], UP),
-                          vec2 = unit(path2[i+1]-path2[i], UP)
+                  check_closed_width = assert(!closed || approx(width[0],last(width)),
+                      "A repeated endpoint on a closed 3D path must have the same width at both ends.");
+                  // Transport the frame on the untrimmed path.  This keeps a cap
+                  // on its original segment even when trimming crosses a corner.
+                  frame_path = closed ? path2 : path;
+                  path_rotmats = cumprod([
+                      for (i = idx(frame_path,e=-2)) let(
+                          vec1 = i==0? UP : unit(frame_path[i]-frame_path[i-1]),
+                          vec2 = unit(frame_path[i+1]-frame_path[i])
                       ) rot(from=vec1,to=vec2)
                   ]);
+                  cutseg = closed ? 0 : min(len(path_rotmats)-1,pathcut_su[0][0]);
+                  rotmats = closed ? path_rotmats : cumprod([
+                      for (i=idx(path2,e=-2)) let(v=path2[i+1]-path2[i])
+                          i==0 ? rot(from=path[cutseg+1]-path[cutseg],to=v)*path_rotmats[cutseg]
+                               : rot(from=path2[i]-path2[i-1],to=v)
+                  ]);
 
-                  sides = [
-                      for (i = idx(path2,e=-2))
-                      quantup(segs(max(widths[i],widths[i+1])/2),4)
-                  ];
+                  // All circular sections use one polygon, including endcaps.
+                  // Use the smallest original width so trimming does not change N.
+                  sides = quantup(segs(min(width)/2),4);
+                  circle_path = circle(r=1, $fn=sides);
+                  segcount = len(path2)-1-(closed?1:0);
+                  seglens = [for (i=[0:1:segcount-1]) norm(path2[i+1]-path2[i])];
+                  lengths = [0, each cumsum(seglens)];
 
-                  // Straight segments
+                  // The extra transported frame lies on the first segment.
+                  // Either close that frame exactly or allow the N-fold symmetry
+                  // of the polygon.  Apply one phase list to both body and joints.
+                  mismatch = closed ? transpose(last(rotmats))*rotmats[0] : ident(4);
+                  closure_angle = atan2(mismatch[1][0],mismatch[0][0]);
+                  symmetry = align_faces ? 1 : sides;
+                  correction = atan2(sin(symmetry*closure_angle),
+                                     cos(symmetry*closure_angle))/symmetry;
+                  // Suppress only numerical noise in the TOTAL correction, not
+                  // individual segment increments.  No minimum-twist batching.
+                  closure_twist = approx(correction,0) ? 0 : correction;
+                  twist_at = [for (s=lengths)
+                      closed ? closure_twist*s/last(lengths) : 0];
+
+                  // Miter clipping removes polygonal overruns at constant-width
+                  // joints.  At a tapered joint, keep both cone ends uncut: an
+                  // angle-bisector clip could otherwise remove exposed material.
+                  miter_overlap = 0;  // Can we get away with this?  If errors arise return to 1e-4
+                  wedge_joints = is_undef(joints) || joints=="round" || joints=="square";
+                  directions = [for (i=[0:1:segcount-1])
+                      unit(path2[i+1]-path2[i])];
+                  untapered = [for (i=[0:1:segcount-1])
+                      approx(widths[i],widths[i+1])];
+                  joint_planes = [for (i=[0:1:segcount])
+                      let(
+                          has_joint = wedge_joints && (closed || (i>0 && i<segcount)) &&
+                                      untapered[(i+segcount-1)%segcount] && untapered[i%segcount],
+                          before = directions[(i+segcount-1)%segcount],
+                          after = directions[i%segcount],
+                          bend_sine = norm(cross(before,after))
+                      )
+                      // Test the normalized cross product, not an acos-derived
+                      // angle: roundoff can make parallel vectors appear bent.
+                      !has_joint || approx(bend_sine,0)
+                          ? undef : unit(before+after)];
+
                   setcolor(color) {
-                      for (i = idx(path2,e=-2)) {
-                          dist = norm(path2[i+1] - path2[i]);
-                          w1 = widths[i]/2;
-                          w2 = widths[i+1]/2;
-                          $fn = sides[i];
-                          translate(path2[i]) {
-                              multmatrix(rotmats[i]) {
-                                  cylinder(r1=w1, r2=w2, h=dist, center=false);
+                      for (i=[0:1:segcount-1]) {
+                          dist = seglens[i];
+                          r1 = widths[i]/2;
+                          r2 = widths[i+1]/2;
+                          delta = twist_at[i+1]-twist_at[i];
+                          // Only the inner overrun is clipped; keep the outer
+                          // boundary section used by the joint wedge.
+                          extent = 2*(dist+max(r1,r2));
+                          _stroke_3d_miter_clip(path2[i], joint_planes[i],
+                              extent, widths[i]*miter_overlap)
+                          _stroke_3d_miter_clip(path2[i+1],
+                              is_undef(joint_planes[i+1]) ? undef : -joint_planes[i+1],
+                              extent, widths[i+1]*miter_overlap)
+                          translate(path2[i])
+                              multmatrix(rotmats[i]*zrot(twist_at[i])) {
+                                  if (delta!=0) {
+                                      // linear_extrude twist has the opposite sign
+                                      // to zrot.  Keep the exact section at each end.
+                                      // Preserving faces can require more twist;
+                                      // limit each slice to half a facet interval.
+                                      linear_extrude(height=dist, scale=r2/r1,
+                                                     twist=-delta,
+                                                     slices=max(2,ceil(abs(delta)*sides/180)),
+                                                     $fn=sides,
+                                                     convexity=convexity)
+                                          circle(r=r1, $fn=sides);
+                                  } else {
+                                      cylinder(r1=r1, r2=r2, h=dist, $fn=sides);
+                                  }
                               }
-                          }
                       }
                   }
 
-                  // Joints
                   setcolor(joint_color) {
-                      for (i = [1:1:len(path2)-2]) {
-                          $fn = sides[i];
+                      for (i=[1:1:len(path2)-2]) {
+                          $fn = sides;
                           translate(path2[i]) {
-                              if (joints != undef && joints != "round") {
-                                  joint_shape = _shape_path(
-                                      joints, width[i],
-                                      joint_width,
-                                      joint_length,
-                                      joint_extent
-                                  );
-                                  multmatrix(rotmats[i] * xrot(180)) {
-                                      $fn = sides[i];
+                              if (!wedge_joints) {
+                                  joint_shape = _shape_path(joints, widths[i],
+                                      joint_width, joint_length, joint_extent);
+                                  // The final joint is at the first path vertex.
+                                  // Use the actual outgoing segment frame there,
+                                  // not its symmetry-equivalent transported copy:
+                                  // an asymmetric flat marker can distinguish them.
+                                  marker_index = closed && i==segcount ? 0 : i;
+                                  multmatrix(rotmats[marker_index]*zrot(twist_at[marker_index])*xrot(180)) {
                                       if (is_undef(joint_angle)) {
-                                          rotate_extrude(convexity=convexity) {
-                                              right_half(planar=true) {
-                                                  polygon(joint_shape);
-                                              }
-                                          }
+                                          if (joint_shape!=[])
+                                              rotate_extrude(convexity=convexity, $fn=sides)
+                                                  right_half(planar=true, s=2*max([1,for(p=joint_shape) norm(p)]))
+                                                      polygon(joint_shape);
                                       } else {
-                                          rotate([90,0,joint_angle]) {
-                                              linear_extrude(height=max(widths[i],0.001), center=true, convexity=convexity) {
+                                          rotate([90,0,joint_angle])
+                                              linear_extrude(height=max(widths[i],0.001), center=true, convexity=convexity)
                                                   polygon(joint_shape);
-                                              }
-                                          }
                                       }
                                   }
                               } else {
-                                  corner = select(path2,i-1,i+1);
-                                  axis = vector_axis(corner);
-                                  ang = vector_angle(corner);
-                                  if (!approx(ang,0)) {
-                                      frame_map(x=path2[i-1]-path2[i], z=-axis) {
-                                          zrot(90-0.5) {
-                                              rotate_extrude(angle=180-ang+1) {
-                                                  arc(d=widths[i], start=-90, angle=180);
-                                              }
-                                          }
-                                      }
+                                  v1 = path2[i]-path2[i-1];
+                                  v2 = path2[i+1]-path2[i];
+                                  d1 = unit(v1);
+                                  d2 = unit(v2);
+                                  axis = cross(d1,d2);
+                                  bend_sine = norm(axis);
+                                  // A straight joint or reversal has no bend axis.
+                                  // Use the same scale-independent test as the clips
+                                  // before normalizing the axis.  atan2 remains
+                                  // accurate for small but nonzero bends.
+                                  if (!approx(bend_sine,0)) {
+                                      ang = atan2(bend_sine,d1*d2);
+                                      joint_frame = frame_map(x=-v1, z=axis/bend_sine);
+                                      to_profile = zrot(-90)*transpose(joint_frame)*
+                                                   rotmats[i-1]*zrot(twist_at[i]);
+                                      ring = apply(to_profile, path3d(circle_path));
+                                      profile = _stroke_3d_half_profile([for(p=ring) [p.x,p.z]]);
+                                      overlap = [min(norm(v1),widths[i-1],widths[i])/8,
+                                                 min(norm(v2),widths[i+1],widths[i])/8];
+                                      // Keep the boundary sections at exactly 0 and
+                                      // ang.  Overlap pyramids connect them to points
+                                      // on the neighboring segment axes.
+                                      // Square joints span the bend in one step,
+                                      // retaining the full cross-sectional polygon.
+                                      steps = joints=="square" ? 1 : max(1,ceil(ang*sides/360));
+                                      multmatrix(joint_frame*zrot(90))
+                                          _stroke_3d_joint(profile*widths[i]/2,
+                                              ang, overlap, steps, convexity);
                                   }
                               }
                           }
                       }
                   }
-                  if (!closed){
-                    // Endcap1
-                    setcolor(endcap_color1) {
-                        translate(path[0]) {
-                            multmatrix(rotmats[0] * xrot(180)) {
-                                $fn = sides[0];
-                                if (is_undef(endcap_angle1)) {
-                                    rotate_extrude(convexity=convexity) {
-                                        right_half(planar=true) {
-                                            polygon(endcap_shape1);
-                                        }
-                                    }
-                                } else {
-                                    rotate([90,0,endcap_angle1]) {
-                                        linear_extrude(height=max(widths[0],0.001), center=true, convexity=convexity) {
-                                            polygon(endcap_shape1);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Endcap2
-                    setcolor(endcap_color2) {
-                        translate(last(path)) {
-                            multmatrix(last(rotmats)) {
-                                $fn = last(sides);
-                                if (is_undef(endcap_angle2)) {
-                                    rotate_extrude(convexity=convexity) {
-                                        right_half(planar=true) {
-                                            polygon(endcap_shape2);
-                                        }
-                                    }
-                                } else {
-                                    rotate([90,0,endcap_angle2]) {
-                                        linear_extrude(height=max(last(widths),0.001), center=true, convexity=convexity) {
-                                            polygon(endcap_shape2);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                  if (!closed) {
+                      // Rebuild spun cap profiles at the shared resolution.  In
+                      // particular, round profiles must include their equator.
+                      // Flat markers retain the original profile and angle rules.
+                      for (which=[0:1]) {
+                          cap = which==0 ? endcap1 : endcap2;
+                          cap_angle = which==0 ? endcap_angle1 : endcap_angle2;
+                          cap_width = which==0 ? endcap_width1 : endcap_width2;
+                          cap_length = which==0 ? endcap_length1 : endcap_length2;
+                          cap_extent = which==0 ? endcap_extent1 : endcap_extent2;
+                          linewidth = which==0 ? width[0] : last(width);
+                          cap_shape = is_undef(cap_angle)
+                              ? _shape_path(cap,linewidth,cap_width,cap_length,cap_extent,$fn=sides)
+                              : which==0 ? endcap_shape1 : endcap_shape2;
+                          cap_frame = which==0 ? path_rotmats[0]*xrot(180) : last(path_rotmats);
+                          setcolor(which==0 ? endcap_color1 : endcap_color2)
+                              translate(which==0 ? path[0] : last(path))
+                                  multmatrix(cap_frame) {
+                                      if (is_undef(cap_angle)) {
+                                          if (cap_shape!=[])
+                                              rotate_extrude(convexity=convexity, $fn=sides)
+                                                  right_half(planar=true, s=2*max([1,for(p=cap_shape) norm(p)]))
+                                                      polygon(cap_shape);
+                                      } else {
+                                          rotate([90,0,cap_angle])
+                                              linear_extrude(height=max(which==0?widths[0]:last(widths),0.001),
+                                                             center=true, convexity=convexity)
+                                                  polygon(cap_shape);
+                                      }
+                                  }
+                      }
                   }
               }
           }
@@ -601,15 +703,82 @@ module stroke(
 }
 
 
+// Keep the side of a joint's bisector plane facing into this segment.
+// The tiny shared overlap avoids face-only CSG contact.  extent bounds the
+// whole segment about either endpoint, not an assumed fixed model scale.
+module _stroke_3d_miter_clip(cp, normal, extent, overlap) {
+    if (is_undef(normal)) {
+        children();
+    } else {
+        intersection() {
+            children();
+            translate(cp)
+                multmatrix(rot(from=UP,to=normal))
+                    translate([-extent,-extent,-overlap])
+                        cube([2*extent,2*extent,extent+overlap]);
+        }
+    }
+}
+
+
+// Clip a convex circular polygon to x>=0.  Sorting by polar angle gives
+// the outer chain from the lower axis point to the upper axis point,
+// independent of the incoming frame's handedness in the profile plane.
+function _stroke_3d_half_profile(profile) =
+    let(
+        pts = [for(p=profile) [abs(p.x)<1e-9 ? 0 : p.x, p.y]],
+        clipped = [for(i=idx(pts)) let(p=pts[i], q=select(pts,i+1))
+            each [
+                if (p.x>=0) p,
+                if ((p.x<0 && q.x>0) || (p.x>0 && q.x<0))
+                    [0, lerp(p.y,q.y,-p.x/(q.x-p.x))]
+            ]],
+        ordered = sort([for(p=clipped) [atan2(p.y,p.x),p.x,p.y]])
+    ) [for(p=ordered) [p[1],p[2]]];
+
+
+// A polygonal joint with exact boundary sections.  One angular step gives
+// a flat bevel across the bend; multiple steps approximate a round joint.
+// The profile retains the segment's full cross-sectional faceting.  The
+// end faces are pyramids that supply CSG overlap without extending the
+// sweep beyond either boundary section.
+module _stroke_3d_joint(profile, angle, overlap, steps, convexity) {
+    cols = len(profile)-2;
+    function pt(row,col) = 4+row*cols+col;
+    points = [
+        [0,0,profile[0].y], [0,0,last(profile).y],
+        [0,-overlap[0],0],
+        overlap[1]*[-sin(angle),cos(angle),0],
+        for (i=[0:1:steps], j=[1:1:len(profile)-2])
+            let(a=angle*i/steps, p=profile[j]) [p.x*cos(a),p.x*sin(a),p.y]
+    ];
+    start = [0, for(j=[0:1:cols-1]) pt(0,j), 1];
+    end = [0, for(j=[0:1:cols-1]) pt(steps,j), 1];
+    faces = [
+        for (i=[0:1:steps-1]) each [
+            [0,pt(i,0),pt(i+1,0)],
+            for (j=[0:1:cols-2]) each [
+                [pt(i,j+1),pt(i+1,j+1),pt(i+1,j)],
+                [pt(i,j+1),pt(i+1,j),pt(i,j)]
+            ],
+            [1,pt(i+1,cols-1),pt(i,cols-1)]
+        ],
+        for (j=idx(start)) [2,select(start,j+1),start[j]],
+        for (j=idx(end)) [3,end[j],select(end,j+1)]
+    ];
+    polyhedron(points=points, faces=faces, convexity=convexity);
+}
+
+
 // Function&Module: dashed_stroke()
 // Synopsis: Draws a dashed line along a path or region boundary.
 // SynTags: Geom, PathList
 // Topics: Paths, Drawing Tools
 // See Also: stroke(), path_cut()
 // Usage: As a Module
-//   dashed_stroke(path, dashpat, [width=], [closed=]);
+//   dashed_stroke(path, [dashpat], [width=], [closed=], [fit=], [roundcaps=]);
 // Usage: As a Function
-//   dashes = dashed_stroke(path, dashpat, [closed=]);
+//   dashes = dashed_stroke(path, [dashpat], [closed=], [fit=], [mindash=]);
 // Description:
 //   Given a path (or region) and a dash pattern, creates a dashed line that follows that
 //   path or region boundary with the given dash pattern.
@@ -620,11 +789,11 @@ module stroke(
 //   a function the dash pattern applies as you specify it.  
 // Arguments:
 //   path = The path or region to subdivide into dashes.
-//   dashpat = A list of alternating dash lengths and space lengths for the dash pattern.  This will be scaled by the width of the line.
+//   dashpat = Alternating dash and space lengths. The module scales these by width; the function uses them directly. Default: [3,3]
 //   ---
 //   width = The width of the dashed line to draw.  Module only.  Default: 1
 //   closed = If true, treat path as a closed polygon.  Default: false
-//   fit = If true, shrink or stretch the dash pattern so that the path ends ofter a logical dash.  Default: true
+//   fit = If true, shrink or stretch the dash pattern so that the path ends after a complete dash.  Default: true
 //   roundcaps = (Module only) If true, draws dashes with rounded caps.  This often looks better.  Default: true
 //   mindash = (Function only) Specifies the minimal dash length to return at the end of a path when fit is false.  Default: 0.5
 // Example(2D): Open Path
@@ -640,7 +809,7 @@ module stroke(
 function dashed_stroke(path, dashpat=[3,3], closed=false, fit=true, mindash=0.5) =
     is_region(path) ? [
         for (p = path)
-        each dashed_stroke(p, dashpat, closed=true, fit=fit)
+        each dashed_stroke(p, dashpat, closed=true, fit=fit, mindash=mindash)
     ] : 
     let(
         path = closed? list_wrap(path) : path,
@@ -664,13 +833,13 @@ function dashed_stroke(path, dashpat=[3,3], closed=false, fit=true, mindash=0.5)
             for (i = idx(dashes))
             if (i % 2 == 0)
             let( dash = dashes[i] )
-            if (i < dcnt-1 || path_length(dash) > mindash)
+            if (fit || i < dcnt-1 || path_length(dash) > mindash)
             dashes[i]
         ]
     ) evens;
 
 
-module dashed_stroke(path, dashpat=[3,3], width=1, closed=false, fit=true, roundcaps=false) {
+module dashed_stroke(path, dashpat=[3,3], width=1, closed=false, fit=true, roundcaps=true) {
     no_children($children);
     segs = dashed_stroke(path, dashpat=dashpat*width, closed=closed, fit=fit, mindash=0.5*width);
     for (seg = segs)
@@ -688,19 +857,19 @@ module dashed_stroke(path, dashpat=[3,3], width=1, closed=false, fit=true, round
 // See Also: pie_slice(), stroke(), ring()
 //
 // Usage: 2D arc from 0º to `angle` degrees.
-//   path=arc(n, r|d=, angle);
+//   path=arc(n, r|d=, angle, [endpoint=]);
 // Usage: 2D arc from START to END degrees.
-//   path=arc(n, r|d=, angle=[START,END]);
+//   path=arc(n, r|d=, angle=[START,END], [endpoint=]);
 // Usage: 2D arc from `start` to `start+angle` degrees.
-//   path=arc(n, r|d=, start=, angle=);
+//   path=arc(n, r|d=, start=, angle=, [endpoint=]);
 // Usage: 2D circle segment by `width` and `thickness`, starting and ending on the X axis.
-//   path=arc(n, width=, thickness=);
+//   path=arc(n, width=, thickness=, [endpoint=]);
 // Usage: Shortest 2D or 3D arc around centerpoint `cp`, starting at P0 and ending on the vector pointing from `cp` to `P1`.
-//   path=arc(n, cp=, points=[P0,P1], [long=], [cw=], [ccw=]);
+//   path=arc(n, cp=, points=[P0,P1], [long=], [cw=], [ccw=], [endpoint=]);
 // Usage: 2D or 3D arc, starting at `P0`, passing through `P1` and ending at `P2`.
-//   path=arc(n, points=[P0,P1,P2]);
+//   path=arc(n, points=[P0,P1,P2], [endpoint=]);
 // Usage: 2D or 3D arc, fron tangent point on segment `[P0,P1]` to the tangent point on segment `[P1,P2]`.
-//   path=arc(n, corner=[P0,P1,P2], r=);
+//   path=arc(n, corner=[P0,P1,P2], r=, [endpoint=]);
 // Usage: Create a wedge using any other arc parameters
 //   path=arc(wedge=true,[rounding=],...)
 // Usage: as module
@@ -904,16 +1073,16 @@ function arc(n, r, angle, d, cp, points, corner, width, thickness, start, wedge=
                    : [
                        if (wedge) cp, 
                        points[dir ? 0 : 1],
-                       each select(arc(n,cp=cp,r=r,angle=ang_range,_minpts=_minpts),1,-2),
+                       each slice(arc(n,cp=cp,r=r,angle=ang_range,_minpts=_minpts),1,-2),
                        points[dir ? 1 : 0]
                      ]
         )
         arcpts;
 
 
-module arc(n, r, angle, d, cp, points, corner, width, thickness, start, wedge=false, rounding, anchor=CENTER, spin=0)
+module arc(n, r, angle, d, cp, points, corner, width, thickness, start, wedge=false, rounding, anchor=CENTER, spin=0, long=false, cw=false, ccw=false)
 {
-    path = arc(n=n, r=r, angle=angle, d=d, cp=cp, points=points, corner=corner, width=width, thickness=thickness, start=start, wedge=wedge, rounding=rounding, _minpts=3);
+    path = arc(n=n, r=r, angle=angle, d=d, cp=cp, points=points, corner=corner, width=width, thickness=thickness, start=start, wedge=wedge, long=long, cw=cw, ccw=ccw, rounding=rounding, _minpts=3);
     assert(len(path[0])==2 || sum(v_abs(column(path,2)))==0, "Module form of arc() only works with 2D inputs.");
     path2d = path2d(path);
     attachable(anchor,spin, two_d=true, path=path2d, extent=false) {
@@ -951,7 +1120,7 @@ function _rounded_arc(radius, rounding=0, angle, n) =
         
         edge_gap1=radius-arc1_cut-radius_of_ctrpt_edge,
         edge_gap2=radius-arc2_cut-radius_of_ctrpt_edge,
-        angle_span1 = rounding[1]>0 ? [-dir*90, dir*arc1_angle] : -[dir*90, dir*180 - arc1_angle],
+        angle_span1 = rounding[1]>0 ? [-dir*90, dir*arc1_angle] : -dir*[90, 180 - arc1_angle],
         angle_span2 = [angle-dir*arc2_angle + (rounding[2]<0 ? dir*180 : 0), angle+dir*90]
     )
     assert(arc1_angle + arc2_angle<=abs(angle), "Roundings are too large: they interfere with each other on the arc")   
@@ -974,18 +1143,21 @@ function _rounded_arc(radius, rounding=0, angle, n) =
 
 
 
-// Function: catenary()
+// Function&Module: catenary()
 // Synopsis: Returns a 2D Catenary chain or arch path.
 // SynTags: Path
 // Topics: Paths
 // See Also: circle(), stroke()
 // Usage:
-//   path = catenary(width, droop=|angle=, n=);
+//   path = catenary(width, droop=|angle=, [n=]);
+// Usage: As a module
+//   catenary(width, droop=|angle=, [n=], [anchor=], [spin=]) [ATTACHMENTS];
 // Description:
-//   Returns a 2D Catenary path, which is the path a chain held at both ends will take.
+//   Returns a 2D catenary path, which is the path a chain held at both ends will take.
+//   The module draws the filled region bounded by this path and its closing segment.
 //   The path will have the endpoints at `[±width/2, 0]`, and the middle of the path will droop
-//   towards Y- if the given droop= or angle= is positive.  It will droop towards Y+ if the
-//   droop= or angle= is negative.  You *must* specify one of droop= or angle=.
+//   towards Y- if the given `droop=` or `angle=` is positive.  It will arch up towards Y+ if 
+//   `droop=` or `angle=` is negative.  You *must* specify one of `droop=` or `angle=`.
 // Arguments:
 //   width = The straight-line distance between the endpoints of the path.
 //   droop = If given, specifies the height difference between the endpoints and the hanging middle of the path.  If given a negative value, returns an arch *above* the Y axis.
@@ -999,7 +1171,7 @@ function _rounded_arc(radius, rounding=0, angle, n) =
 // Example(2D): By Angle
 //   stroke(catenary(100, angle=30));
 // Example(2D): Upwards Arch by Angle
-//   stroke(catenary(100, angle=30));
+//   stroke(catenary(100, angle=-30));
 // Example(2D): Upwards Arch by Height Delta
 //   stroke(catenary(100, droop=-30));
 // Example(2D): Specifying Vertex Count
@@ -1058,7 +1230,7 @@ module catenary(width, droop, n=100, angle, anchor=CTR, spin=0) {
 
 
 // Function: helix()
-// Synopsis: Creates a 2d spiral or 3d helical path.
+// Synopsis: Creates a 3D helical path, including flat spirals.
 // SynTags: Path
 // Topics: Path Generators, Paths, Drawing Tools
 // See Also: pie_slice(), stroke(), thread_helix(), path_sweep()
@@ -1066,16 +1238,16 @@ module catenary(width, droop, n=100, angle, anchor=CTR, spin=0) {
 // Usage:
 //   path = helix(l|h, [turns=], [angle=], r=|r1=|r2=, d=|d1=|d2=);
 // Description:
-//   Returns a 3D helical path on a cone, including the degerate case of flat spirals.
+//   Returns a 3D helical path on a cone, including the degenerate case of flat spirals.
 //   You can specify start and end radii.  You can give the length, the helix angle, or the number of turns: two
 //   of these three parameters define the helix.  For a flat helix you must give length 0 and a turn count.
 //   Helix will be right handed if turns is positive and left handed if it is negative.
-//   The angle is calculateld based on the radius at the base of the helix.
+//   The angle is calculated based on the radius at the base of the helix.
 // Arguments:
 //   h/l = Height/length of helix, zero for a flat spiral
 //   ---
 //   turns = Number of turns in helix, positive for right handed
-//   angle = helix angle
+//   angle = Helix angle at the starting radius. With length supplied, its sign relative to length determines handedness; the path still ends at the supplied length.
 //   r = Radius of helix
 //   r1 = Radius of bottom of helix
 //   r2 = Radius of top of helix
@@ -1087,7 +1259,7 @@ module catenary(width, droop, n=100, angle, anchor=CTR, spin=0) {
 // Example(3D):  Helix that turns the other way
 //   stroke(helix(turns=-2.5, h=100, r=50), dots=true, dots_color="blue");
 // Example(3D): Flat helix (note points are still 3d)
-//   stroke(helix(h=0,r1=50,r2=25,l=0, turns=4));
+//   stroke(helix(h=0,r1=50,r2=25, turns=4));
 module helix(l,h,turns,angle, r, r1, r2, d, d1, d2) {no_module();}
 function helix(l,h,turns,angle, r, r1, r2, d, d1, d2)=
     let(
@@ -1097,16 +1269,21 @@ function helix(l,h,turns,angle, r, r1, r2, d, d1, d2)=
     )
     assert(num_defined([length,turns,angle])==2,"Must define exactly two of l/h, turns, and angle")
     assert(is_undef(angle) || length!=0, "Cannot give length 0 with an angle")
+    assert(is_undef(turns) || (is_finite(turns) && turns!=0), "turns must be finite and nonzero")
+    assert(is_undef(length) || is_finite(length), "Helix length must be finite")
+    assert(is_undef(angle) || (is_finite(angle) && angle!=0 && abs(angle)<90 && r1>0),
+           "angle must be nonzero and strictly between -90 and 90, with a positive starting radius")
     let(
         // length advances dz for each turn
         dz = is_def(angle) && length!=0 ? 2*PI*r1*tan(angle) : length/abs(turns),
 
         maxtheta = is_def(turns) ? 360*turns : 360*length/dz,
+        endheight = is_def(length) ? length : abs(turns)*dz,
         N = segs(max(r1,r2))
     )
     [for(theta=lerpn(0,maxtheta, max(3,ceil(abs(maxtheta)*N/360))))
        let(R=lerp(r1,r2,theta/maxtheta))
-       [R*cos(theta), R*sin(theta), abs(theta)/360 * dz]];
+       [R*cos(theta), R*sin(theta), theta/maxtheta * endheight]];
 
 
 function _normal_segment(p1,p2) =
@@ -1129,7 +1306,7 @@ function _normal_segment(p1,p2) =
 //   the computed turtle path.  If you set `full_state` to true then it instead returns the full turtle state.
 //   You can invoke `turtle` again with this full state to continue the turtle path where you left off.
 //   .
-//   The turtle state is a list with three entries: the path constructed so far, the current step as a 2-vector, the current default angle,
+//   The turtle state is a list with four entries: the path constructed so far, the current step as a 2-vector, the current default angle,
 //   and the current arcsteps setting.  
 //   .
 //   Commands     | Arguments          | What it does
@@ -1142,7 +1319,7 @@ function _normal_segment(p1,p2) =
 //   "untily"     | ytarget            | Move turtle in turtle direction until y==ytarget.  Produces an error if ytarget is not reachable.
 //   "jump"       | point              | Move the turtle to the specified point
 //   "xjump"      | x                  | Move the turtle's x position to the specified value
-//   "yjump       | y                  | Move the turtle's y position to the specified value
+//   "yjump"      | y                  | Move the turtle's y position to the specified value
 //   "turn"       | [angle]            | Turn turtle direction by specified angle, or the turtle's default turn angle.  The default angle starts at 90.
 //   "left"       | [angle]            | Same as "turn"
 //   "right"      | [angle]            | Same as "turn", -angle
@@ -1241,15 +1418,15 @@ function _normal_segment(p1,p2) =
 
 module turtle(commands, state=[[[0,0]],[1,0],90,0], full_state=false, repeat=1) {no_module();}
 function turtle(commands, state=[[[0,0]],[1,0],90,0], full_state=false, repeat=1) =
+    assert(is_int(repeat) && repeat>=0, "turtle repeat argument must be a nonnegative integer")
     let( state = is_vector(state) ? [[state],[1,0],90,0] : state )
         repeat == 1?
             _turtle(commands,state,full_state) :
             _turtle_repeat(commands, state, full_state, repeat);
 
 function _turtle_repeat(commands, state, full_state, repeat) =
-    repeat==1?
-        _turtle(commands,state,full_state) :
-        _turtle_repeat(commands, _turtle(commands, state, true), full_state, repeat-1);
+    repeat==0 ? (full_state ? state : state[0]) :
+    _turtle_repeat(commands, _turtle(commands, state, true), full_state, repeat-1);
 
 function _turtle_command_len(commands, index) =
     let( one_or_two_arg = ["arcleft","arcright", "arcleftto", "arcrightto"] )
@@ -1272,7 +1449,7 @@ function _turtle(commands, state, full_state, index=0) =
 
 function _turtle_command(command, parm, parm2, state, index) =
     command == "repeat"?
-        assert(is_num(parm),str("\"repeat\" command requires a numeric repeat count at index ",index))
+        assert(is_int(parm) && parm>=0,str("\"repeat\" command requires a nonnegative integer repeat count at index ",index))
         assert(is_list(parm2),str("\"repeat\" command requires a command list parameter at index ",index))
         _turtle_repeat(parm2, state, true, parm) :
     let(
@@ -1328,7 +1505,8 @@ function _turtle_command(command, parm, parm2, state, index) =
     command=="length" ? list_set(state, step, parm*unit(state[step])) :
     command=="scale" ?  list_set(state, step, parm*state[step]) :
     command=="addlength" ?  list_set(state, step, state[step]+unit(state[step])*parm) :
-    command=="arcsteps" ? list_set(state, arcsteps, parm) :
+    command=="arcsteps" ? assert(is_int(parm) && parm>=0, "arcsteps must be a nonnegative integer")
+                          list_set(state, arcsteps, parm) :
     command=="arcleft" || command=="arcright" ?
         assert(is_num(parm),str("\"",command,"\" command requires a numeric radius value at index ",index))  
         let(
@@ -1339,7 +1517,7 @@ function _turtle_command(command, parm, parm2, state, index) =
             steps = state[arcsteps]==0 ? segs(abs(radius)) : state[arcsteps],
             arcpath = myangle == 0 || radius == 0 ? []
                     : arc(
-                           steps,
+                           steps+1,
                            points = [
                                lastpt,
                                rot(cp=center, p=lastpt, a=sign(parm)*lrsign*myangle/2),
@@ -1365,7 +1543,7 @@ function _turtle_command(command, parm, parm2, state, index) =
             end_angle = posmod(parm2,360),
             delta_angle =  -start_angle + (lrsign * end_angle < lrsign*start_angle ? end_angle+lrsign*360 : end_angle),
             arcpath = delta_angle == 0 || radius==0 ? [] : arc(
-                steps,
+                steps+1,
                 points = [
                     lastpt,
                     rot(cp=center, p=lastpt, a=sign(radius)*delta_angle/2),
@@ -1392,7 +1570,7 @@ function _turtle_command(command, parm, parm2, state, index) =
 // See Also: debug_region(), debug_vnf(), debug_bezier()
 //
 // Usage:
-//   debug_polygon(points, paths, [vertices=], [edges=], [convexity=], [size=]);
+//   debug_polygon(points, [paths], [vertices=], [edges=], [convexity=], [size=]);
 // Description:
 //   A drop-in replacement for `polygon()` that renders and labels the path points and
 //   edges.  The start of each path is marked with a blue circle and the end with a pink diamond.
@@ -1403,8 +1581,8 @@ function _turtle_command(command, parm, parm2, state, index) =
 //   ---
 //   vertices = if true display vertex labels and start/end markers.  Default: true
 //   edges = if true display edge labels.  Default: true
-//   convexity = The max number of walls a ray can pass through the given polygon paths.
-//   size = The base size of the line and labels.
+//   convexity = The max number of walls a ray can pass through the given polygon paths. Default: 2
+//   size = The base size of the line and labels. Default: 1
 // Example(Big2D):
 //   debug_polygon(
 //       points=concat(
@@ -1431,8 +1609,8 @@ module debug_polygon(points, paths, vertices=true, edges=true, convexity=2, size
     }
     if (vertices)
       _debug_poly_verts(points,size);
-    if (edges)
-      for (j = [0:1:len(paths)-1]) _debug_poly_edges(j, points, paths[j], vertices, size);
+    if (vertices || edges)
+      for (j = [0:1:len(paths)-1]) _debug_poly_edges(j, points, paths[j], vertices, size, edges);
 }
 
 
@@ -1457,7 +1635,7 @@ module _debug_poly_verts(points, size)
 }
 
 
-module _debug_poly_edges(j,points, path,vertices,size)
+module _debug_poly_edges(j,points, path,vertices,size,edges=true)
 {  
        path = default(path, count(len(points)));
        if (vertices){
@@ -1468,7 +1646,7 @@ module _debug_poly_edges(j,points, path,vertices,size)
                 color("pink") up(0.11) cylinder(d=size*1.5, h=0.01, center=false, $fn=4);
             }
         }
-        for (i = [0:1:len(path)-1]) {
+        if (edges) for (i = [0:1:len(path)-1]) {
             midpt = (points[path[i]] + points[path[(i+1)%len(path)]])/2;
             color("blue") {
                 up(0.2) {

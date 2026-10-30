@@ -172,7 +172,7 @@ function move_copies(a=[[0,0,0]],p=_NO_ARG) =
 //   When called as a function, *with* a `p=` argument, returns a list of transformed copies of `p=`.
 //
 // Arguments:
-//   spacing = Given a scalar, specifies a uniform spacing between copies. Given a list of scalars, each one gives a specific position along the line. (Default: 1.0)
+//   spacing = Given a scalar, specifies a uniform spacing between copies. Given a list of scalars, each one gives a specific position along the line.
 //   n = Number of copies to place. (Default: 2)
 //   ---
 //   l = If given, the length to place copies over.
@@ -203,12 +203,10 @@ module xcopies(spacing, n, l, sp)
     dir = RIGHT;
     sp = is_finite(sp)? (sp*dir) : sp;
     if (is_vector(spacing)) {
-        translate(default(sp,[0,0,0])) {
-            for (i = idx(spacing)) {
-                $idx = i;
-                $pos = spacing[i]*dir;
-                translate($pos) children();
-            }
+        for (i = idx(spacing)) {
+            $idx = i;
+            $pos = point3d(default(sp,[0,0,0])) + spacing[i]*dir;
+            translate($pos) children();
         }
     } else {
         line_copies(
@@ -257,7 +255,7 @@ function xcopies(spacing, n, l, sp, p=_NO_ARG) =
 //   When called as a function, *with* a `p=` argument, returns a list of transformed copies of `p=`.
 //
 // Arguments:
-//   spacing = Given a scalar, specifies a uniform spacing between copies. Given a list of scalars, each one gives a specific position along the line. (Default: 1.0)
+//   spacing = Given a scalar, specifies a uniform spacing between copies. Given a list of scalars, each one gives a specific position along the line.
 //   n = Number of copies to place on the line. (Default: 2)
 //   ---
 //   l = If given, the length to place copies over.
@@ -288,12 +286,10 @@ module ycopies(spacing, n, l, sp)
     dir = BACK;
     sp = is_finite(sp)? (sp*dir) : sp;
     if (is_vector(spacing)) {
-        translate(default(sp,[0,0,0])) {
-            for (i = idx(spacing)) {
-                $idx = i;
-                $pos = spacing[i]*dir;
-                translate($pos) children();
-            }
+        for (i = idx(spacing)) {
+            $idx = i;
+            $pos = point3d(default(sp,[0,0,0])) + spacing[i]*dir;
+            translate($pos) children();
         }
     } else {
         line_copies(
@@ -342,7 +338,7 @@ function ycopies(spacing, n, l, sp, p=_NO_ARG) =
 //   When called as a function, *with* a `p=` argument, returns a list of transformed copies of `p=`.
 //
 // Arguments:
-//   spacing = Given a scalar, specifies a uniform spacing between copies. Given a list of scalars, each one gives a specific position along the line. (Default: 1.0)
+//   spacing = Given a scalar, specifies a uniform spacing between copies. Given a list of scalars, each one gives a specific position along the line.
 //   n = Number of copies to place. (Default: 2)
 //   ---
 //   l = If given, the length to place copies over.
@@ -387,12 +383,10 @@ module zcopies(spacing, n, l, sp)
     dir = UP;
     sp = is_finite(sp)? (sp*dir) : sp;
     if (is_vector(spacing)) {
-        translate(default(sp,[0,0,0])) {
-            for (i = idx(spacing)) {
-                $idx = i;
-                $pos = spacing[i]*dir;
-                translate($pos) children();
-            }
+        for (i = idx(spacing)) {
+            $idx = i;
+            $pos = point3d(default(sp,[0,0,0])) + spacing[i]*dir;
+            translate($pos) children();
         }
     } else {
         line_copies(
@@ -545,7 +539,7 @@ function line_copies(spacing, n, l, p1, p2, p=_NO_ARG) =
             : 2,
         spc = cnt<=1? [0,0,0]
             : is_undef(spacing) && is_def(ll)? ll/(cnt-1) 
-            : is_num(spacing) && is_def(ll)? ll/(cnt-1)
+            : is_num(spacing) && is_def(ll)? unit(ll,RIGHT)*abs(spacing)
             : scalar_vec3(spacing, 0)
     )
     assert(!is_undef(cnt), "Need two of `spacing`, 'l', 'n', or `p1`/`p2` arguments in `line_copies()`.")
@@ -560,71 +554,113 @@ function line_copies(spacing, n, l, p1, p2, p=_NO_ARG) =
 // See Also: move_copies(), xcopies(), ycopies(), zcopies(), line_copies(), rot_copies(), xrot_copies(), yrot_copies(), zrot_copies(), arc_copies(), sphere_copies()
 //
 // Usage:
-//   grid_copies(spacing, size=, [stagger=], [scale=], [inside=], [axes=]) CHILDREN;
-//   grid_copies(n=, size=, [stagger=], [scale=], [inside=], [axes=]) CHILDREN;
-//   grid_copies(spacing, [n], [stagger=], [scale=], [inside=], [axes=]) CHILDREN;
-//   grid_copies(n=, inside=, [stagger], [scale], [axes=]) CHILDREN;
+//   grid_copies(spacing, size=, [stagger=], [inside=], [nonzero=], [axes=]) CHILDREN;
+//   grid_copies(n=, size=, [stagger=], [inside=], [nonzero=], [axes=]) CHILDREN;
+//   grid_copies(spacing, n, [stagger=], [inside=], [nonzero=], [axes=]) CHILDREN;
+//   grid_copies(n=, inside=, [nonzero=], [stagger=], [axes=]) CHILDREN;
+//   grid_copies(spacing, inside=, [nonzero=], [stagger=], [axes=]) CHILDREN;
 // Usage: As a function to translate points, VNF, or Bezier patches
-//   copies = grid_copies(spacing, size=, [stagger=], [scale=], [inside=], [axes=], p=);
-//   copies = grid_copies(n=, size=, [stagger=], [scale=], [inside=], [axes=], p=);
-//   copies = grid_copies(spacing, [n], [stagger=], [scale=], [inside=], [axes=], p=);
-//   copies = grid_copies(n=, inside=, [stagger], [scale], [axes=], p=);
-// Usage: Get Translation Matrices
-//   mats = grid_copies(spacing, size=, [stagger=], [scale=], [inside=], [axes=]);
-//   mats = grid_copies(n=, size=, [stagger=], [scale=], [inside=], [axes=]);
-//   mats = grid_copies(spacing, [n], [stagger=], [scale=], [inside=], [axes=]);
-//   mats = grid_copies(n=, inside=, [stagger], [scale], [axes=]);
+//   copies = grid_copies(..., p=);
+// Usage: As a function to get a list of translation matrices
+//   mat_list = grid_copies(...);
 // Description:
-//   When called as a module, makes a square or hexagonal grid of copies of children, with an optional masking polygon or region.
+//   When called as a module, makes a square or staggered (possibly equilateral) grid of copies of children,
+//   with an optional masking polygon or region.
 //   When called as a function, *without* a `p=` argument, returns a list of transformation matrices, one for each copy.
 //   When called as a function, *with* a `p=` argument, returns a list of transformed copies of `p=`.
 //   .
-//   The `stagger` parameter causes each row to be offset from the one below.  
-//   By default the layout is in the xy plane where a row runs in the x direction.  You can choose
-//   any pair of axes for the layout using the `axes` parameter, which is a two letter parameter
-//   where the first letter gives the direction o a row.  The default is "xy".  The order matters because
-//   whichever axis is first will correspond to the first entry in `size`, and if you set `stagger=true` that
-//   operates on rows, so interchanging the axes will produce a different result.  
+//   The grid is centered on the origin and is determined by two of `n`, `spacing` and `size`.  (The `inside` parameter can
+//   stand in for `size` as described below.)  The `spacing` parameter sets the distance between copies as
+//   a number or `[spacing1,spacing2]` pair; a negative value reverses the order in which the copies are generated.
+//   The `n` parameter specifies the dimensions of the grid either as a scalar or a pair giving
+//   the number of columns and number of rows, [width,height].  The `size` parameter specifies a rectangular
+//   size to fill with copies either as a scalar or as a [width,height] pair.  When you combine `size` with
+//   `n` the copies exactly fill the specified rectangle (except when `n=1`).  If you combine `size` with `spacing` then
+//   the copies are placed exactly `spacing` apart, as many as fit within `size`, so `size` acts as
+//   a bound, and the copies won't necessarily reach its edges.  
+//   .
+//   When `stagger=true` only half the items appear in each row, with every alternate item being omitted.
+//   The first item in the first row is retained unless you specify `stagger="alt"`, in which case the first item
+//   is omitted (and the second retained).  The rows alternate the pattern, resulting in a triangular grid.  If you give a scalar `spacing` value 
+//   it sets the spacing between the items to form a grid of equilateral triangles with that spacing.  If you give a vector
+//   for `spacing` then it specifies the spacing in the usual way of the underlying grid, before items have been ommitted.
+//   This means that spacing.x gives half the space between items horizontally, and spacing.y gives the vertical
+//   spacing; with stagger enabled, `spacing=5` and `spacing=[5,5]` are **not** equivalent.  A scalar spacing of `s` is equivalent
+//   to `[s/2, s*sqrt(3)/2]`.  If spacing is derived from `size` and `n` then the computed spacing vector applies directly
+//   and the layout is not likely to be equilateral.  Since staggering works by skipping items you will always get
+//   about half as many child objects as when `stagger=false`. 
+//   .
+//   The `inside` argument, a polygon or region applies on top of all of the above.  It removes every copy
+//   whose center is not inside the shape (the boundary counts as inside).  If every copy is removed, nothing is produced.
+//   If you give two of `n`, `spacing` and `size` then `inside` only filters the result.  If you give
+//   just one of `spacing` or `n` and do not supply `size` then `inside` provides the size as the smallest rectangle centered
+//   on the origin that contains the shape.  If you give `inside` alone or with only size that is an error.
+//   .
+//   Both forms of grid_copies() distributes their grid on a plane, but using the `axes=` argument you can choose
+//   any of the coordinate planes and you can also flip the meaning of "rows" and "columns".  The `axes=` parameter accepts
+//   a two letter string giving the two axes that define the grid plane.  The default is `axes="xy"`.  If you 
+//   specify `axes="xz"` then the children are distributed on the XZ plane.  If you specify `axes="yx"` then the items
+//   still appear in the XY plane, but with the axes interchanged, so in this case, n=[2,5] will produce a grid that is
+//   five objects along X and two objects along Y.  If staggering is enabled then alternate items will be removed from
+//   each **column** (a line of constant X) rather than each row.  
 //
 // Arguments:
-//   spacing = Distance between copies in [X,Y] or scalar distance.
-//   n = How many columns and rows of copies to make.  Can be given as `[COLS,ROWS]`, or just as a scalar that specifies both.  If staggered, count both staggered and unstaggered columns and rows.  Default: 2 (3 if staggered)
-//   size = The [X,Y] size to spread the copies over.
+//   spacing = Distance between copies as a scalar or [spacing1,spacing2].  When `stagger` is enabled, a scalar gives equilateral separation.  
+//   n = Number of columns and rows, either a vector `[width, height]` or a scalar to give both.  If staggered, the count includes omitted items that appear in the rows.  
+//   size = Size of a rectangle to bound the centerpoints of all of the copies, can be a scalar or vector.  
 //   ---
-//   stagger = If true, make a staggered (hexagonal) grid.  If false, make square grid.  If `"alt"`, makes alternate staggered pattern.  Default: false
-//   inside = If given a list of polygon points, or a region, only creates copies whose center would be inside the polygon or region.  Polygon can be concave and/or self crossing.
+//   stagger = If true, make a staggered (possibly equilateral) grid.  If false, make square grid.  If `"alt"`, makes the alternate staggered pattern.  Default: false
+//   inside = If given a list of polygon points, or a region, only creates copies whose centers are inside the polygon or region (including on the boundary).  Polygon can be concave and/or self crossing.
 //   nonzero = If inside is set to a polygon with self-crossings then use the nonzero method for deciding if points are in the polygon.  Default: false
-//   axes = Specify the axes to use for the row and column directions as a 2 character string.  Default: "xy"
-//   p = Either a point, pointlist, VNF or Bezier patch to be translated when used as a function.
+//   axes = Specify the axes from "x", "y" and "z" to use for the row and column directions as a 2 character string.  Default: "xy"
+//   p = Either a point, pointlist, VNF, or Bezier patch to be translated when used as a function.
 //
 // Side Effects:
-//   `$pos` is set to the relative centerpoint of each child copy, and can be used to modify each child individually.
-//   `$col` is set to the integer column number for each child.
+//   `$pos` is set to the center coordinates of the child. 
+//   `$col` is set to the integer column number for each child (in the unstaggered grid).
 //   `$row` is set to the integer row number for each child.
 //   `$idx` is set to a unique index for each child, progressing across rows first, from the bottom
 //
+// Example(2D):
+//   grid_copies(n=7, spacing=10) circle(d=10);
+// Example(2D): Staggered items form an equilateral grid
+//   grid_copies(n=7, spacing=10, stagger=true) circle(d=10);
+// Example(2D): Alternate grid form
+//   grid_copies(n=7, spacing=10, stagger="alt") circle(d=10);
+// Example(2D): Interchanging the axes
+//   grid_copies(n=7, spacing=10, stagger=true,axes="yx")
+//     circle(d=10);
+// Example(2D): Vector spacing with staggered items
+//   grid_copies(n=7, spacing=[10,10], stagger=true) circle(d=10);
+// Example(2D): Fitting to a size: item centers fill the size
+//   grid_copies(size=50, n=5) circle(d=10);
+//   stroke(rect(50),color="red",closed=true);
+// Example(2D): Fitting to a size with spacing and stagger gives equilateral spacing
+//   grid_copies(size=50, spacing=10, stagger=true) circle(d=10);
+//   stroke(rect(50),color="red",closed=true);
+// Example(2D): Fitting to a size with n and stagger does not give equilateral spacing
+//   grid_copies(size=50, n=6,stagger=true) circle(d=10);
+//   stroke(rect(50),color="red",closed=true);
 // Examples:
-//   grid_copies(size=50, spacing=10) cylinder(d=10, h=1);
 //   grid_copies(size=50, spacing=[10,15]) cylinder(d=10, h=1);
 //   grid_copies(spacing=10, n=[13,7], stagger=true) cylinder(d=6, h=5);
-//   grid_copies(spacing=10, n=[13,7], stagger="alt") cylinder(d=6, h=5);
-//   grid_copies(size=50, n=11, stagger=true) cylinder(d=5, h=1);
-// Example(3D,VPR=[66.90,0.00,36.90],VPD=199.87,VPT=[4.05,9.59,-0.91]): Setting the axes to "xz"
-//   grid_copies(size=50, n=[13,7], stagger=true, axes="xz") cylinder(d=5, h=4);
+// Example(3D,VPR=[66.90,0.00,36.90],VPD=199.87,VPT=[4.05,9.59,-0.91]): Setting the axes to "xz" puts copies in the XZ plane.
+//   grid_copies(size=50, n=[13,7], stagger=true, axes="xz")
+//     cylinder(d=5, h=4);
 // Example(3D,VPR=[66.90,0.00,36.90],VPD=199.87,VPT=[4.05,9.59,-0.91]): The layout is different with axes="zx"
-//   grid_copies(size=50, n=[13,7], stagger=true, axes="zx") cylinder(d=5, h=4);
-//
-// Example:
+//   grid_copies(size=50, n=[13,7], stagger=true, axes="zx")
+//     cylinder(d=5, h=4);
+// Example(2D): Using `inside` constrains the centerpoints of the copies to lie in a polygon
 //   poly = [[-25,-25], [25,25], [-25,25], [25,-25]];
 //   grid_copies(spacing=5, stagger=true, inside=poly)
-//      zrot(180/6) cylinder(d=5, h=1, $fn=6);
+//      zrot(180/6) hexagon(d=5); 
 //   %polygon(poly);
-//
+// Example(2D): Using `inside` to provide the size with just spacing 
+//   grid_copies(inside=star(id=30,od=75,n=5), spacing=2) star(id=1,od=2,n=7);
 // Example: Using `$row` and `$col`
 //   grid_copies(spacing=8, n=8)
 //       color(($row+$col)%2?"black":"red")
 //           cube([8,8,0.01], center=false);
-//
 // Example: Makes a grid of hexagon pillars whose tops are all angled to reflect light at [0,0,50], if they were shiny.
 //   hexregion = circle(r=50.01,$fn=6);
 //   grid_copies(spacing=10, stagger=true, inside=hexregion)
@@ -641,132 +677,74 @@ module grid2d(spacing, n, size, stagger=false, inside=undef, nonzero)
    grid_copies(spacing, n, size, stagger, inside, nonzero) children();
 }   
 
-module grid_copies(spacing, n, size, stagger=false, inside=undef, nonzero, axes="xy")
-{
-    req_children($children);    
-    dummy = assert(in_list(stagger, [false, true, "alt"]))
-            assert(is_string(axes) && search(axes[0], "xyz")!=[] && search(axes[1], "xyz")!=[] && axes[0]!=axes[1], "Invalid axes specification");
-    xind = search("x",axes);
-    yind = search("y",axes);
-    zind = search("z",axes);        
-    permax = function(pt) [xind==[] ? 0 : pt[xind[0]],
-                           yind==[] ? 0 : pt[yind[0]],
-                           zind==[] ? 0 : pt[zind[0]]];
-    bounds = is_undef(inside)? undef :
-        is_path(inside)? pointlist_bounds(inside) :
-        assert(is_region(inside))
-        pointlist_bounds(flatten(inside));
-    nonzero = is_path(inside) ? default(nonzero,false)
-            : assert(is_undef(nonzero), "nonzero only allowed if inside is a polygon")
-              false;
-    size = is_num(size)? [size, size] :
-        is_vector(size)? assert(len(size)==2) size :
-        bounds!=undef? [
-            for (i=[0:1]) 2*max(abs(bounds[0][i]),bounds[1][i])
-        ] : undef;
-    spacing = is_num(spacing)? (
-            stagger!=false? polar_to_xy(spacing,60) :
-            [spacing,spacing]
-        ) :
-        is_vector(spacing)? assert(len(spacing)==2) spacing :
-        size!=undef? (
-            is_num(n)? v_div(size,(n-1)*[1,1]) :
-            is_vector(n)? assert(len(n)==2) v_div(size,n-[1,1]) :
-            v_div(size,(stagger==false? [1,1] : [2,2]))
-        ) :
-        undef;
-    n = is_num(n)? [n,n] :
-        is_vector(n)? assert(len(n)==2) n :
-        size!=undef && spacing!=undef? v_floor(v_div(size,spacing))+[1,1] :
-        [2,2];
-    dummy2 = assert(is_int(n[0]) && is_int(n[1]), "The number of rows/columns must be an integer");
-    offset = v_mul(spacing, n-[1,1])/2;
 
-    poslist = 
-      stagger==false ? 
-               [for (row = [0:1:n.y-1], col = [0:1:n.x-1])
-                   let(
-                       pos = v_mul([col,row],spacing) - offset
-                   )
-                   if (
-                           is_undef(inside) ||
-                           (is_path(inside) && point_in_polygon(pos, inside, nonzero=nonzero)>=0) ||
-                           (is_region(inside) && point_in_region(pos, inside)>=0)
-                   )
-                   [pos,row,col]
-               ]
-      :
-        let(  // stagger == true or stagger == "alt"
-            staggermod = (stagger == "alt")? 1 : 0,
-            cols1 = ceil(n.x/2),
-            cols2 = n.x - cols1
-         )
-         [for (row = [0:1:n.y-1])
-              let(
-                rowcols = ((row%2) == staggermod)? cols1 : cols2
-              )
-              if (rowcols > 0) 
-                for (col = [0:1:rowcols-1])
-                  let(
-                    rowdx = (row%2 != staggermod)? spacing.x : 0,
-                    pos = v_mul([2*col,row],spacing) + [rowdx,0] - offset
-                  )
-                    if (
-                        is_undef(inside) ||
-                        (is_path(inside) && point_in_polygon(pos, inside, nonzero=nonzero)>=0) ||
-                        (is_region(inside) && point_in_region(pos, inside)>=0)
-                    )
-                    [pos, row, col * 2 + ((row%2!=staggermod)? 1 : 0)]
-        ];
-    for(i=idx(poslist)){
-      $idx=i;
-      $pos=permax(poslist[i][0]);
-      $row=poslist[i][1];
-      $col=poslist[i][2];
-      translate(permax(poslist[i][0]))children();
-    }
-}
-
-
-function grid_copies(spacing, n, size, stagger=false, inside=undef, nonzero, axes="xy", p=_NO_ARG) =
+function _grid_copies_list(spacing, n, size, stagger, inside, nonzero, axes) =
     let(
         dummy = assert(in_list(stagger, [false, true, "alt"]))
-                assert(is_string(axes) && search(axes[0], "xyz")!=[] && search(axes[1], "xyz")!=[] && axes[0]!=axes[1], "Invalid axes specification"),
+                assert(is_string(axes) && len(axes)==2 && search(axes[0], "xyz")!=[] && search(axes[1], "xyz")!=[] && axes[0]!=axes[1],
+                       "\nInvalid axes specification"),
+        count_check = assert(is_undef(n) ||
+            (is_num(n) ? is_int(n) && n>=1 :
+             is_vector(n,2) && is_int(n[0]) && is_int(n[1]) && min(n)>=1),
+            "\nThe number of rows/columns must be integers at least 1"),
+        // These checks use the arguments as the caller gave them, so they come
+        // before size, spacing and n are reassigned below.  Inside counts as size
+        // when size is not given, so inside alone, or inside with only size, is
+        // one of the three and is not enough.
+        arg_check = assert(is_undef(spacing) || is_num(spacing) || is_vector(spacing,2),
+                           "\nspacing must be a number or a vector [xspacing,yspacing]")
+                    assert(is_undef(size) || is_num(size) || is_vector(size,2),
+                           "\nsize must be a number or a vector [xsize,ysize]")
+                    assert((is_undef(spacing)? 0 : 1) + (is_undef(n)? 0 : 1)
+                           + ((is_undef(size) && is_undef(inside))? 0 : 1) >= 2,
+                           "\nMust give two of spacing, n and size (inside counts as size if size is not given)")
+                    assert(is_undef(spacing) || is_undef(n) || is_undef(size),
+                           "\nCannot give spacing, n and size together: give at most two of them"),
         xind = search("x",axes),
         yind = search("y",axes),
-        zind = search("z",axes),        
+        zind = search("z",axes),
         permax = function(pt) [xind==[] ? 0 : pt[xind[0]],
                                yind==[] ? 0 : pt[yind[0]],
                                zind==[] ? 0 : pt[zind[0]]],
+        // Spacing from a size and counts.  An axis with a count of 1 gets spacing 0,
+        // which is never used because the offset and position on that axis are both 0.
+        spc_from_size = function(sz,nn) [for (i=[0:1]) nn[i]>1 ? sz[i]/(nn[i]-1) : 0],
         bounds = is_undef(inside)? undef :
             is_path(inside)? pointlist_bounds(inside) :
             assert(is_region(inside))
             pointlist_bounds(flatten(inside)),
         nonzero = is_path(inside) ? default(nonzero,false)
-                : assert(is_undef(nonzero), "nonzero only allowed if inside is a polygon")
+                : assert(is_undef(nonzero), "\nnonzero only allowed if inside is a polygon")
                   false,
         size = is_num(size)? [size, size] :
             is_vector(size)? assert(len(size)==2) size :
             bounds!=undef? [
                 for (i=[0:1]) 2*max(abs(bounds[0][i]),bounds[1][i])
             ] : undef,
+        size_check = assert(is_undef(size) || min(size)>=0, "\nsize must not be negative"),
         spacing = is_num(spacing)? (
                 stagger!=false? polar_to_xy(spacing,60) :
                 [spacing,spacing]
             ) :
             is_vector(spacing)? assert(len(spacing)==2) spacing :
-            size!=undef? (
-                is_num(n)? v_div(size,(n-1)*[1,1]) :
-                is_vector(n)? assert(len(n)==2) v_div(size,n-[1,1]) :
-                v_div(size,(stagger==false? [1,1] : [2,2]))
-            ) :
+            size!=undef && n!=undef? spc_from_size(size, is_num(n)? [n,n] : n) :
             undef,
+        // n is about to be computed from spacing, so spacing must be nonzero on both
+        // axes, otherwise the division below gives infinity or NaN.  Here n is still
+        // the caller's argument.
+        n_from_spacing_check = assert(!is_undef(n) || (spacing[0]!=0 && spacing[1]!=0),
+                                      "\nWhen n is not given, spacing must be nonzero along both axes"),
         n = is_num(n)? [n,n] :
             is_vector(n)? assert(len(n)==2) n :
-            size!=undef && spacing!=undef? v_floor(v_div(size,spacing))+[1,1] :
-            [2,2],
+            size!=undef && spacing!=undef? v_floor(v_div(size,[abs(spacing[0]),abs(spacing[1])])+[_EPSILON,_EPSILON])+[1,1] :
+            undef,
+        count_check2 = assert(is_int(n[0]) && is_int(n[1]) && min(n)>=1,
+                              "\nThe number of rows/columns must be integers at least 1"),
+        spacing_check = assert([for (i=[0:1]) if (n[i]>1 && spacing[i]==0) i]==[],
+                               "\nSpacing (given or computed from size) must be nonzero along any axis with more than one copy"),
         offset = v_mul(spacing, n-[1,1])/2,
-        mats = stagger == false
+        // Each entry is [pos, row, col] where pos is in the grid's own two coordinates
+        poslist = stagger == false
           ? [
                 for (row = [0:1:n.y-1], col = [0:1:n.x-1])
                 let( pos = v_mul([col,row],spacing) - offset )
@@ -775,7 +753,7 @@ function grid_copies(spacing, n, size, stagger=false, inside=undef, nonzero, axe
                     (is_path(inside) && point_in_polygon(pos, inside, nonzero=nonzero)>=0) ||
                     (is_region(inside) && point_in_region(pos, inside)>=0)
                 )
-                translate(permax(pos))
+                [pos, row, col]
             ]
           : // stagger == true or stagger == "alt"
             let(
@@ -797,10 +775,34 @@ function grid_copies(spacing, n, size, stagger=false, inside=undef, nonzero, axe
                     (is_path(inside) && point_in_polygon(pos, inside, nonzero=nonzero)>=0) ||
                     (is_region(inside) && point_in_region(pos, inside)>=0)
                 )
-                translate(permax(pos))
+                [pos, row, col * 2 + ((row%2!=staggermod)? 1 : 0)]
             ]
     )
+    // Entries returned are [3D position after applying axes, row, col]
+    [for (e = poslist) [permax(e[0]), e[1], e[2]]];
+
+
+module grid_copies(spacing, n, size, stagger=false, inside=undef, nonzero, axes="xy")
+{
+    req_children($children);
+    list = _grid_copies_list(spacing, n, size, stagger, inside, nonzero, axes);
+    for (i = idx(list)) {
+        $idx = i;
+        $pos = list[i][0];
+        $row = list[i][1];
+        $col = list[i][2];
+        translate(list[i][0]) children();
+    }
+}
+
+
+function grid_copies(spacing, n, size, stagger=false, inside=undef, nonzero, axes="xy", p=_NO_ARG) =
+    let(
+        list = _grid_copies_list(spacing, n, size, stagger, inside, nonzero, axes),
+        mats = [for (e = list) translate(e[0])]
+    )
     p==_NO_ARG? mats : [for (m = mats) apply(m, p)];
+
 
 
 //////////////////////////////////////////////////////////////////////
@@ -833,7 +835,7 @@ function grid_copies(spacing, n, size, stagger=false, inside=undef, nonzero, axe
 //   - If given a count `n`, makes that many copies, rotated evenly around the axis.
 //   - If given an offset `delta`, translates each child by that amount before rotating them into place.  This makes rings.
 //   - If given a centerpoint `cp`, centers the ring around that centerpoint.
-//   - If `subrot` is true, each child will be rotated in place to keep the same size towards the center when making rings.
+//   - If `subrot` is true, each child will be rotated in place to keep the same side towards the center when making rings.
 //   - The first (unrotated) copy will be placed at the relative starting angle `sa`.
 //   .
 //   When called as a function, *without* a `p=` argument, returns a list of transformation matrices, one for each copy.
@@ -842,13 +844,13 @@ function grid_copies(spacing, n, size, stagger=false, inside=undef, nonzero, axe
 // Arguments:
 //   rots = A list of [X,Y,Z] rotation angles in degrees.  If `v` is given, this will be a list of scalar angles in degrees to rotate around `v`.
 //   v = If given, this is the vector of the axis to rotate around.
-//   cp = Centerpoint to rotate around.  Default: `[0,0,0]`
+//   cp = Centerpoint to rotate around. Default: [0,0,0]
 //   ---
 //   n = Optional number of evenly distributed copies, rotated around the axis.
 //   sa = Starting angle, in degrees.  For use with `n`.  Angle is in degrees counter-clockwise.  Default: 0
 //   delta = [X,Y,Z] amount to move away from cp before rotating.  Makes rings of copies.  Default: `[0,0,0]`
 //   subrot = If false, don't sub-rotate children as they are copied around the ring.  Instead maintain their native orientation.  The false setting is only allowed when `delta` is given.  Default: `true`
-//   p = Either a point, pointlist, VNF or Bezier patch to be translated when used as a function.
+//   p = Either a point, pointlist, VNF, or Bezier patch to be translated when used as a function.
 //
 // Side Effects:
 //   `$ang` is set to the rotation angle (or XYZ rotation triplet) of each child copy, and can be used to modify each child individually.
@@ -884,11 +886,11 @@ function grid_copies(spacing, n, size, stagger=false, inside=undef, nonzero, axe
 //   rot_copies(n=6, v=DOWN+BACK, delta=[20,0,0], subrot=false)
 //       yrot(90) cylinder(h=20, r1=5, r2=0);
 //   color("red",0.333) yrot(90) cylinder(h=20, r1=5, r2=0);
-module rot_copies(rots=[], v, cp=[0,0,0], n, sa=0, offset=0, delta=[0,0,0], subrot=true)
+module rot_copies(rots=[], v, cp=[0,0,0], n, sa=0, delta=[0,0,0], subrot=true)
 {
     assert(subrot || norm(delta)>0, "subrot can only be false if delta is not zero");
     req_children($children);  
-    sang = sa + offset;
+    sang = sa;
     angs = !is_undef(n)?
         (n<=0? [] : [for (i=[0:1:n-1]) i/n*360+sang]) :
         rots==[]? [] :
@@ -897,7 +899,7 @@ module rot_copies(rots=[], v, cp=[0,0,0], n, sa=0, offset=0, delta=[0,0,0], subr
         [for (a=rots) a];
     for ($idx = idx(angs)) {
         $ang = angs[$idx];
-        $axis = v;
+        $axis = is_vector($ang) ? undef : default(v,UP);
         translate(cp) {
             rotate(a=$ang, v=v) {
                 translate(delta) { 
@@ -913,10 +915,10 @@ module rot_copies(rots=[], v, cp=[0,0,0], n, sa=0, offset=0, delta=[0,0,0], subr
 }
 
 
-function rot_copies(rots=[], v, cp=[0,0,0], n, sa=0, offset=0, delta=[0,0,0], subrot=true, p=_NO_ARG) =
+function rot_copies(rots=[], v, cp=[0,0,0], n, sa=0, delta=[0,0,0], subrot=true, p=_NO_ARG) =
     assert(subrot || norm(delta)>0, "subrot can only be false if delta is not zero")
     let(
-        sang = sa + offset,
+        sang = sa,
         angs = !is_undef(n)?
             (n<=0? [] : [for (i=[0:1:n-1]) i/n*360+sang]) :
             rots==[]? [] :
@@ -956,7 +958,7 @@ function rot_copies(rots=[], v, cp=[0,0,0], n, sa=0, offset=0, delta=[0,0,0], su
 //   - If given a count `n`, makes that many copies, rotated evenly around the X axis.
 //   - If given a radius `r` (or diameter `d`), distributes children around a ring of that size around the X axis.
 //   - If given a centerpoint `cp`, centers the rotation around that centerpoint.
-//   - If `subrot` is true, each child will be rotated in place to keep the same size towards the center when making rings.
+//   - If `subrot` is true, each child will be rotated in place to keep the same side towards the center when making rings.
 //   - The first (unrotated) copy will be placed at the relative starting angle `sa`.
 //   .
 //   When called as a function, *without* a `p=` argument, returns a list of transformation matrices, one for each copy.
@@ -964,14 +966,13 @@ function rot_copies(rots=[], v, cp=[0,0,0], n, sa=0, offset=0, delta=[0,0,0], su
 //
 // Arguments:
 //   rots = Optional array of rotation angles, in degrees, to make copies at.
-//   cp = Centerpoint to rotate around.
+//   cp = Centerpoint to rotate around. Default: [0,0,0]
 //   ---
 //   n = Optional number of evenly distributed copies to be rotated around the ring.
-//   sa = Starting angle, in degrees.  For use with `n`.  Angle is in degrees counter-clockwise from Y+, when facing the origin from X+.  First unrotated copy is placed at that angle.
+//   sa = Starting angle, in degrees. For use with n. Counter-clockwise from Y+, when facing the origin from X+. Default: 0
 //   r = If given, makes a ring of child copies around the X axis, at the given radius.  Default: 0
 //   d = If given, makes a ring of child copies around the X axis, at the given diameter.
 //   subrot = If false, don't sub-rotate children as they are copied around the ring.  Instead maintain their native orientation.  The false setting is only allowed when `d` or `r` is given.  Default: `true`
-//   subrot = If false, don't sub-rotate children as they are copied around the ring.
 //   p = Either a point, pointlist, VNF or Bezier patch to be translated when used as a function.
 //
 // Side Effects:
@@ -1042,7 +1043,7 @@ function xrot_copies(rots=[], cp=[0,0,0], n, sa=0, r, d, subrot=true, p=_NO_ARG)
 //   - If given a count `n`, makes that many copies, rotated evenly around the Y axis.
 //   - If given a radius `r` (or diameter `d`), distributes children around a ring of that size around the Y axis.
 //   - If given a centerpoint `cp`, centers the rotation around that centerpoint.
-//   - If `subrot` is true, each child will be rotated in place to keep the same size towards the center when making rings.
+//   - If `subrot` is true, each child will be rotated in place to keep the same side towards the center when making rings.
 //   - The first (unrotated) copy will be placed at the relative starting angle `sa`.
 //   .
 //   When called as a function, *without* a `p=` argument, returns a list of transformation matrices, one for each copy.
@@ -1050,10 +1051,10 @@ function xrot_copies(rots=[], cp=[0,0,0], n, sa=0, r, d, subrot=true, p=_NO_ARG)
 //
 // Arguments:
 //   rots = Optional array of rotation angles, in degrees, to make copies at.
-//   cp = Centerpoint to rotate around.
+//   cp = Centerpoint to rotate around. Default: [0,0,0]
 //   ---
 //   n = Optional number of evenly distributed copies to be rotated around the ring.
-//   sa = Starting angle, in degrees.  For use with `n`.  Angle is in degrees counter-clockwise from X-, when facing the origin from Y+.
+//   sa = Starting angle, in degrees. For use with n. Counter-clockwise from X-, when facing the origin from Y+. Default: 0
 //   r = If given, makes a ring of child copies around the Y axis, at the given radius.  Default: 0
 //   d = If given, makes a ring of child copies around the Y axis, at the given diameter.
 //   subrot = If false, don't sub-rotate children as they are copied around the ring.  Instead maintain their native orientation.  The false setting is only allowed when `d` or `r` is given.  Default: `true`
@@ -1128,7 +1129,7 @@ function yrot_copies(rots=[], cp=[0,0,0], n, sa=0, r, d, subrot=true, p=_NO_ARG)
 //   - If given a count `n`, makes that many copies, rotated evenly around the Z axis.
 //   - If given a radius `r` (or diameter `d`), distributes children around a ring of that size around the Z axis.
 //   - If given a centerpoint `cp`, centers the rotation around that centerpoint.
-//   - If `subrot` is true, each child will be rotated in place to keep the same size towards the center when making rings.
+//   - If `subrot` is true, each child will be rotated in place to keep the same side towards the center when making rings.
 //   - The first (unrotated) copy will be placed at the relative starting angle `sa`.
 //   .
 //   When called as a function, *without* a `p=` argument, returns a list of transformation matrices, one for each copy.
@@ -1136,7 +1137,7 @@ function yrot_copies(rots=[], cp=[0,0,0], n, sa=0, r, d, subrot=true, p=_NO_ARG)
 //
 // Arguments:
 //   rots = Optional array of rotation angles, in degrees, to make copies at.
-//   cp = Centerpoint to rotate around.  Default: [0,0,0]
+//   cp = Centerpoint to rotate around. Default: [0,0,0]
 //   ---
 //   n = Optional number of evenly distributed copies to be rotated around the ring.
 //   sa = Starting angle, in degrees.  For use with `n`.  Angle is in degrees counter-clockwise from X+, when facing the origin from Z+.  Default: 0
@@ -1215,7 +1216,7 @@ function zrot_copies(rots=[], cp=[0,0,0], n, sa=0, r, d, subrot=true, p=_NO_ARG)
 //   When called as a function, *with* a `p=` argument, returns a list of transformed copies of `p=`.
 //
 // Arguments:
-//   n = number of copies to distribute around the circle. (Default: 6)
+//   n = Number of copies to distribute around the arc. With n=1, place the copy at sa. Default: 6
 //   r = radius of circle (Default: 1)
 //   ---
 //   rx = radius of ellipse on X axis. Used instead of r.
@@ -1269,12 +1270,13 @@ module arc_copies(
     rot=true
 ) {
     req_children($children);
+    assert(is_int(n) && n>=0, "n must be a nonnegative integer");
     rx = get_radius(r1=rx, r=r, d1=dx, d=d, dflt=1);
     ry = get_radius(r1=ry, r=r, d1=dy, d=d, dflt=1);
     sa = posmod(sa, 360);
     ea = posmod(ea, 360);
     extra_n = (abs(ea-sa)<0.01)?1:0;
-    delt = (((ea<=sa)?360.0:0)+ea-sa)/(n-1+extra_n);
+    delt = n<=1 ? 0 : (((ea<=sa)?360.0:0)+ea-sa)/(n-1+extra_n);
     for ($idx = [0:1:n-1]) {
         $ang = sa + ($idx * delt);
         $pos =[rx*cos($ang), ry*sin($ang), 0];
@@ -1296,13 +1298,14 @@ function arc_copies(
     rot=true,
     p=_NO_ARG
 ) =
+    assert(is_int(n) && n>=0, "n must be a nonnegative integer")
     let(
         rx = get_radius(r1=rx, r=r, d1=dx, d=d, dflt=1),
         ry = get_radius(r1=ry, r=r, d1=dy, d=d, dflt=1),
         sa = posmod(sa, 360),
         ea = posmod(ea, 360),
         extra_n = (abs(ea-sa)<0.01)?1:0,
-        delt = (((ea<=sa)?360.0:0)+ea-sa)/(n-1+extra_n),
+        delt = n<=1 ? 0 : (((ea<=sa)?360.0:0)+ea-sa)/(n-1+extra_n),
         mats = [
             for (i = [0:1:n-1])
             let(
@@ -1324,25 +1327,28 @@ function arc_copies(
 // See Also: rot_copies(), xrot_copies(), yrot_copies(), zrot_copies(), arc_copies(), move_copies(), xcopies(), ycopies(), zcopies(), line_copies(), grid_copies() 
 //
 // Usage:
-//   sphere_copies(n, r|d=, [cone_ang=], [scale=], [perp=]) CHILDREN;
+//   sphere_copies(n, r|d=, [cone_ang=|fraction=], [scale=], [perp=]) CHILDREN;
 // Usage: As a function to translate points, VNF, or Bezier patches
-//   copies = sphere_copies(n, r|d=, [cone_ang=], [scale=], [perp=], p=);
+//   copies = sphere_copies(n, r|d=, [cone_ang=|fraction=], [scale=], [perp=], p=);
 // Usage: Get Translation Matrices
-//   mats = sphere_copies(n, r|d=, [cone_ang=], [scale=], [perp=]);
+//   mats = sphere_copies(n, r|d=, [cone_ang=|fraction=], [scale=], [perp=]);
 //
 // Description:
 //   When called as a module, spreads children semi-evenly over the surface of a sphere or ellipsoid.
 //   When called as a function, *without* a `p=` argument, returns a list of transformation matrices, one for each copy.
 //   When called as a function, *with* a `p=` argument, returns a list of transformed copies of `p=`.
+//   Versions of BOSL2 prior to Oct 1, 2026 had a bug where cone_angle produced the wrong distribution.
+//   To obtain the old behavior use the `fraction=` parameter with your old cone angle divided by 180.  
 //
 // Arguments:
-//   n = How many copies to evenly spread over the surface.
-//   r = Radius of the sphere to distribute over
+//   n = How many copies to evenly spread over the surface. Default: 100
+//   r = Radius of the sphere to distribute over. Default: 50
 //   ---
 //   d = Diameter of the sphere to distribute over
-//   cone_ang = Angle of the cone, in degrees, to limit how much of the sphere gets covered.  For full sphere coverage, use 180.  Measured pre-scaling.  Default: 180
-//   scale = The [X,Y,Z] scaling factors to reshape the sphere being covered.
-//   perp = If true, rotate children to be perpendicular to the sphere surface.  Default: true
+//   cone_ang = Angle of the cone, in degrees, to limit how much of the sphere gets covered.  For full sphere coverage, use 180.  Measured from the positive-Z pole before scaling. Cannot combine with fraction. Default: 180
+//   fraction = Fraction of the sphere's surface area to cover, starting at the positive-Z pole; greater than 0 and at most 1. Use fraction=A/180 to reproduce positions from the former cone_ang=A behavior. Cannot combine with cone_ang. Default: 1
+//   scale = The [X,Y,Z] scaling factors to reshape the sphere being covered. Default: [1,1,1]
+//   perp = If true, rotate children to be perpendicular to the sphere or ellipsoid surface. Nonzero scale components are required.  Default: true
 //   p = Either a point, pointlist, VNF or Bezier patch to be translated when used as a function.
 //
 // Side Effects:
@@ -1365,15 +1371,20 @@ function arc_copies(
 module ovoid_spread(n=100, r=undef, d=undef, cone_ang=90, scale=[1,1,1], perp=true)
 {
   deprecate("sphere_copies");
-  sphere_copies(n,r,d,cone_ang,scale,perp) children();
+  sphere_copies(n=n,r=r,d=d,scale=scale,perp=perp,fraction=cone_ang/180) children();
 }  
 
 
-module sphere_copies(n=100, r=undef, d=undef, cone_ang=90, scale=[1,1,1], perp=true)
+module sphere_copies(n=100, r=undef, d=undef, cone_ang, scale=[1,1,1], perp=true, fraction)
 {
     req_children($children);  
     r = get_radius(r=r, d=d, dflt=50);
-    cnt = ceil(n / (cone_ang/180));
+    fraction = _sphere_copies_fraction(cone_ang, fraction);
+    assert(is_int(n) && n>=0, "n must be a nonnegative integer");
+    assert(is_vector(scale) && (len(scale)==2 || len(scale)==3), "scale must be a 2D or 3D vector");
+    scale3 = point3d(scale,1);
+    assert(!perp || all_nonzero(scale3), "perp=true requires nonzero scale components");
+    cnt = ceil(n / fraction);
 
     // Calculate an array of [theta,phi] angles for `n` number of
     // points, almost evenly spaced across the surface of a sphere.
@@ -1383,13 +1394,13 @@ module sphere_copies(n=100, r=undef, d=undef, cone_ang=90, scale=[1,1,1], perp=t
     for ($idx = idx(theta_phis)) {
         tp = theta_phis[$idx];
         xyz = spherical_to_xyz(r, tp[0], tp[1]);
-        $pos = v_mul(xyz,point3d(scale,1));
+        $pos = v_mul(xyz,scale3);
         $theta = tp[0];
         $phi = tp[1];
         $rad = r;
         translate($pos) {
             if (perp) {
-                rot(from=UP, to=xyz) children();
+                rot(from=UP, to=v_div(xyz,scale3)) children();
             } else {
                 children();
             }
@@ -1398,10 +1409,15 @@ module sphere_copies(n=100, r=undef, d=undef, cone_ang=90, scale=[1,1,1], perp=t
 }
 
 
-function sphere_copies(n=100, r=undef, d=undef, cone_ang=90, scale=[1,1,1], perp=true, p=_NO_ARG) =
+function sphere_copies(n=100, r=undef, d=undef, cone_ang, scale=[1,1,1], perp=true, fraction, p=_NO_ARG) =
+    assert(is_int(n) && n>=0, "n must be a nonnegative integer")
+    assert(is_vector(scale) && (len(scale)==2 || len(scale)==3), "scale must be a 2D or 3D vector")
     let(
         r = get_radius(r=r, d=d, dflt=50),
-        cnt = ceil(n / (cone_ang/180)),
+        fraction = _sphere_copies_fraction(cone_ang, fraction),
+        scale3 = point3d(scale,1),
+        check = assert(!perp || all_nonzero(scale3), "perp=true requires nonzero scale components"),
+        cnt = ceil(n / fraction),
 
         // Calculate an array of [theta,phi] angles for `n` number of
         // points, almost evenly spaced across the surface of a sphere.
@@ -1412,14 +1428,28 @@ function sphere_copies(n=100, r=undef, d=undef, cone_ang=90, scale=[1,1,1], perp
             for (tp = theta_phis)
             let(
                 xyz = spherical_to_xyz(r, tp[0], tp[1]),
-                pos = v_mul(xyz,point3d(scale,1))
+                pos = v_mul(xyz,scale3)
             )
             translate(pos) *
-            (perp? rot(from=UP, to=xyz) : ident(4))
+            (perp? rot(from=UP, to=v_div(xyz,scale3)) : ident(4))
         ]
     )
     p==_NO_ARG? mats : [for (m = mats) apply(m, p)];
 
+
+
+/// Internal Function: _sphere_copies_fraction()
+function _sphere_copies_fraction(cone_ang, fraction) =
+    assert(num_defined([cone_ang,fraction])<=1, "Specify only one of cone_ang and fraction")
+    assert(is_undef(cone_ang) || (is_finite(cone_ang) && cone_ang>0 && cone_ang<=180),
+           "cone_ang must be greater than zero and at most 180")
+    assert(is_undef(fraction) || (is_finite(fraction) && fraction>0 && fraction<=1),
+           "fraction must be greater than zero and at most 1")
+    is_def(cone_ang)
+      ? echo(str("sphere_copies(): cone_ang now specifies the actual polar angle. ",
+                 "To reproduce the previous positions, use fraction=",cone_ang/180,"."))
+        pow(sin(cone_ang/2),2)
+      : default(fraction,1);
 
 
 // Section: Placing copies of all children on a path
@@ -1461,7 +1491,7 @@ function sphere_copies(n=100, r=undef, d=undef, cone_ang=90, scale=[1,1,1], perp
 //   sp = if given, copies will start distance sp from the path start and spread beyond that point
 //   rotate_children = if true, rotate children to line up with curve normal.  Default: true
 //   ---
-//   dist = Specify a list of distances to determine placement of children.  
+//   dist = Specify a distance or list of distances to determine placement of children.  
 //   closed = If true treat path as a closed curve.  Default: false
 //   p = Either a point, pointlist, VNF or Bezier patch to be translated when used as a function.
 //
@@ -1537,22 +1567,17 @@ function sphere_copies(n=100, r=undef, d=undef, cone_ang=90, scale=[1,1,1], perp
 //      color("red") xcyl(h=10,r=.2, anchor=FRONT+LEFT);  // x-aligned cylinder
 //   }
 
-module path_spread(path, n, spacing, sp=undef, rotate_children=true, dist, closed){
-  deprecate("path_copes");
-  path_copies(path,n,spacing,sp,dist,rotate_children,dist, closed) children();
-}  
-
-
-module path_copies(path, n, spacing, sp=undef, dist, rotate_children=true, dist, closed)
+module path_copies(path, n, spacing, sp=undef, rotate_children=true, dist, closed)
 {
     req_children($children);  
     is_1reg = is_1region(path);
     path = is_1reg ? path[0] : path;
     closed = default(closed, is_1reg);
     length = path_length(path,closed);
+    dist = is_num(dist) ? [dist] : dist;
     distind = is_def(dist) ? sortidx(dist) : undef;
     distances =
-        is_def(dist) ? assert(is_undef(n) && is_undef(spacing) && is_undef(sp), "Can't use n, spacing or undef with dist")
+        is_def(dist) ? assert(is_undef(n) && is_undef(spacing) && is_undef(sp), "Can't use n, spacing or sp with dist")
                        select(dist,distind)
       : is_def(sp)? (   // Start point given
             is_def(n) && is_def(spacing)? count(n,sp,spacing) :
@@ -1576,8 +1601,8 @@ module path_copies(path, n, spacing, sp=undef, dist, rotate_children=true, dist,
     for(i=[0:1:len(cutlist)-1]) {
         $pos = cutlist[i][0];
         $idx = is_def(dist) ? distind[i] : i;
-        $dir = !rotate_children ? (planar?[1,0]:[1,0,0]) : cutlist[i][2];
-        $normal = !rotate_children? (planar?[0,1]:[0,0,1]) : cutlist[i][3];
+        $dir = cutlist[i][2];
+        $normal = cutlist[i][3];
         translate($pos) {
             if (rotate_children) {
                 if(planar) {
@@ -1594,15 +1619,16 @@ module path_copies(path, n, spacing, sp=undef, dist, rotate_children=true, dist,
 }
 
 
-function path_copies(path, n, spacing, sp=undef, dist, rotate_children=true, dist, closed, p=_NO_ARG) =
+function path_copies(path, n, spacing, sp=undef, rotate_children=true, dist, closed, p=_NO_ARG) =
     let(
         is_1reg = is_1region(path),
         path = is_1reg ? path[0] : path,
         closed = default(closed, is_1reg),
         length = path_length(path,closed),
+        dist = is_num(dist) ? [dist] : dist,
         distind = is_def(dist) ? sortidx(dist) : undef,
         distances =
-            is_def(dist) ? assert(is_undef(n) && is_undef(spacing) && is_undef(sp), "Can't use n, spacing or undef with dist")
+            is_def(dist) ? assert(is_undef(n) && is_undef(spacing) && is_undef(sp), "Can't use n, spacing or sp with dist")
                            select(dist,distind)
           : is_def(sp)? (   // Start point given
                 is_def(n) && is_def(spacing)? count(n,sp,spacing) :
@@ -1800,11 +1826,11 @@ function zflip_copy(offset=0, z=0, p=_NO_ARG) =
 // See Also: xflip_copy(), yflip_copy(), zflip_copy(), path_copies(), move_copies(), xcopies(), ycopies(), zcopies(), line_copies(), grid_copies() 
 //
 // Usage:
-//   mirror_copy(v, [cp], [offset]) CHILDREN;
+//   mirror_copy(v, [offset=], [cp=]) CHILDREN;
 // Usage: As a function to translate points, VNF, or Bezier patches
-//   copies = mirror_copy(v, [cp], [offset], p=);
+//   copies = mirror_copy(v, [offset=], [cp=], p=);
 // Usage: Get Translation Matrices
-//   mats = mirror_copy(v, [cp], [offset]);
+//   mats = mirror_copy(v, [offset=], [cp=]);
 //
 // Description:
 //   When called as a module, makes a copy of the children, mirrored across the given plane.
@@ -1812,9 +1838,9 @@ function zflip_copy(offset=0, z=0, p=_NO_ARG) =
 //   When called as a function, *with* a `p=` argument, returns a list of transformed copies of `p=`.
 //
 // Arguments:
-//   v = The normal vector of the plane to mirror across.
-//   offset = distance to offset away from the plane.
-//   cp = A point that lies on the mirroring plane.
+//   v = The normal vector of the plane to mirror across, or a plane [A,B,C,D] specifying A*x+B*y+C*z=D. Default: UP
+//   offset = Distance to offset along the plane normal before copying. Default: 0
+//   cp = A point on the mirroring plane, or its signed distance from the origin along the unit normal. Ignored when v is a plane. Default: [0,0,0]
 //   ---
 //   p = Either a point, pointlist, VNF or Bezier patch to be translated when used as a function.
 //
@@ -1837,7 +1863,7 @@ function zflip_copy(offset=0, z=0, p=_NO_ARG) =
 module mirror_copy(v=[0,0,1], offset=0, cp)
 {
     req_children($children);  
-    cp = is_vector(v,4)? plane_normal(v) * v[3] :
+    cp = is_vector(v,4)? plane_normal(v) * plane_offset(v) :
         is_vector(cp)? cp :
         is_num(cp)? cp*unit(v) :
         [0,0,0];
@@ -1871,7 +1897,7 @@ module mirror_copy(v=[0,0,1], offset=0, cp)
 
 function mirror_copy(v=[0,0,1], offset=0, cp, p=_NO_ARG) =
     let(
-        cp = is_vector(v,4)? plane_normal(v) * v[3] :
+        cp = is_vector(v,4)? plane_normal(v) * plane_offset(v) :
             is_vector(cp)? cp :
             is_num(cp)? cp*unit(v) :
             [0,0,0],
@@ -1927,10 +1953,10 @@ module xdistribute(spacing=10, sizes=undef, l=undef)
 {
     req_children($children);  
     dir = RIGHT;
-    gaps = ($children < 2)? [0] :
+    gaps = ($children < 2)? [] :
         !is_undef(sizes)? [for (i=[0:1:$children-2]) sizes[i]/2 + sizes[i+1]/2] :
         [for (i=[0:1:$children-2]) 0];
-    spc = !is_undef(l)? ((l - sum(gaps)) / ($children-1)) : default(spacing, 10);
+    spc = $children<2 ? 0 : !is_undef(l)? ((l - sum(gaps)) / ($children-1)) : default(spacing, 10);
     gaps2 = [for (gap = gaps) gap+spc];
     spos = dir * -sum(gaps2)/2;
     spacings = cumsum([0, each gaps2]);
@@ -1976,10 +2002,10 @@ module ydistribute(spacing=10, sizes=undef, l=undef)
 {
     req_children($children);  
     dir = BACK;
-    gaps = ($children < 2)? [0] :
+    gaps = ($children < 2)? [] :
         !is_undef(sizes)? [for (i=[0:1:$children-2]) sizes[i]/2 + sizes[i+1]/2] :
         [for (i=[0:1:$children-2]) 0];
-    spc = !is_undef(l)? ((l - sum(gaps)) / ($children-1)) : default(spacing, 10);
+    spc = $children<2 ? 0 : !is_undef(l)? ((l - sum(gaps)) / ($children-1)) : default(spacing, 10);
     gaps2 = [for (gap = gaps) gap+spc];
     spos = dir * -sum(gaps2)/2;
     spacings = cumsum([0, each gaps2]);
@@ -2025,10 +2051,10 @@ module zdistribute(spacing=10, sizes=undef, l=undef)
 {
     req_children($children);  
     dir = UP;
-    gaps = ($children < 2)? [0] :
+    gaps = ($children < 2)? [] :
         !is_undef(sizes)? [for (i=[0:1:$children-2]) sizes[i]/2 + sizes[i+1]/2] :
         [for (i=[0:1:$children-2]) 0];
-    spc = !is_undef(l)? ((l - sum(gaps)) / ($children-1)) : default(spacing, 10);
+    spc = $children<2 ? 0 : !is_undef(l)? ((l - sum(gaps)) / ($children-1)) : default(spacing, 10);
     gaps2 = [for (gap = gaps) gap+spc];
     spos = dir * -sum(gaps2)/2;
     spacings = cumsum([0, each gaps2]);
@@ -2075,10 +2101,10 @@ module zdistribute(spacing=10, sizes=undef, l=undef)
 module distribute(spacing=undef, sizes=undef, dir=RIGHT, l=undef)
 {
     req_children($children);  
-    gaps = ($children < 2)? [0] :
+    gaps = ($children < 2)? [] :
         !is_undef(sizes)? [for (i=[0:1:$children-2]) sizes[i]/2 + sizes[i+1]/2] :
         [for (i=[0:1:$children-2]) 0];
-    spc = !is_undef(l)? ((l - sum(gaps)) / ($children-1)) : default(spacing, 10);
+    spc = $children<2 ? 0 : !is_undef(l)? ((l - sum(gaps)) / ($children-1)) : default(spacing, 10);
     gaps2 = [for (gap = gaps) gap+spc];
     spos = dir * -sum(gaps2)/2;
     spacings = cumsum([0, each gaps2]);

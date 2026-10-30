@@ -173,7 +173,7 @@ function all_integer(x) =
 //   bool = is_nan(42);     // Returns: false
 //   bool = is_nan("foo");  // Returns: false
 //   bool = is_nan(NAN);    // Returns: true
-function is_nan(x) = (x!=x);
+function is_nan(x) = !is_list(x) && (x!=x);
 
 
 // Function: is_finite()
@@ -281,7 +281,7 @@ function is_func(x) = version_num()>20210000 && is_function(x);
 //   is_consistent([3,4,5], 0);            // Returns true
 //   is_consistent([3,4,undef], 0);        // Returns false
 //   is_consistent([[3,4],[4,5]], [1,1]);  // Returns true
-//   is_consistent([[3,"a"],[4,true]], [1,undef]);  // Returns true
+//   is_consistent([[3,"a"],[4,true]], [1,undef]);  // Returns false
 //   is_consistent([[3,4], 6, [4,5]], [1,1]);  // Returns false
 //   is_consistent([[1,[3,4]], [4,[5,6]]], [1,[2,3]]);    // Returns true
 //   is_consistent([[1,[3,INF]], [4,[5,6]]], [1,[2,3]]);  // Returns false
@@ -301,13 +301,14 @@ function _list_pattern(list) =
 
 
 // Function: same_shape()
-// Synopsis: Returns true if the argument lists are numeric and of the same shape.
+// Synopsis: Checks that the second argument is numeric and matches the first argument's structure.
 // Topics: Type Checking, Testing
 // See Also: is_homogeneous(), is_consistent()
 // Usage:
 //   bool = same_shape(a,b);
 // Description:
-//   Tests whether the inputs `a` and `b` are both numeric and are the same shaped list.
+//   Uses `a` as a structural pattern and checks that `b` has the same structure and finite numeric contents.
+//   The contents of `a` are not validated; check them separately when both inputs must be numeric.
 // Example:
 //   same_shape([3,[4,5]],[7,[3,4]]);   // Returns true
 //   same_shape([3,4,5], [7,[3,4]]);    // Returns false
@@ -450,7 +451,7 @@ function num_true(l, func) =
 // Topics: Undef Handling
 // See Also: first_defined(), one_defined(), num_defined()
 // Usage:
-//   val = default(val, dflt);
+//   val = default(v, dflt);
 // Description:
 //   Returns the value given as `v` if it is not `undef`.
 //   Otherwise, returns the value of `dflt`.
@@ -719,13 +720,15 @@ function get_anchor(anchor,center,uncentered=BOT,dflt=CENTER) =
 //   r = get_radius(r1=undef, r2=8, d=6, dflt=1);    // Returns: 8
 //   r = get_radius(r1=undef, d=6, dflt=1);          // Returns: 3
 //   r = get_radius(d1=7, d=6, dflt=1);              // Returns: 3.5
-//   r = get_radius(d1=7, d2=8, d=6, dflt=1);        // Returns: 3.5
+//   // get_radius(d1=7, d2=8, d=6, dflt=1);  // Error: conflicting specific diameters.
 //   r = get_radius(d1=undef, d2=8, d=6, dflt=1);    // Returns: 4
 //   r = get_radius(r1=8, d=6, dflt=1);              // Returns: 8
 function get_radius(r1, r2, r, d1, d2, d, dflt) = 
     assert(num_defined([r1,d1,r2,d2])<2, "Conflicting or redundant radius/diameter arguments given.")
     assert(num_defined([r,d])<2, "Conflicting or redundant radius/diameter arguments given.")
     let(
+        value = first_defined([r1,d1,r2,d2,r,d,dflt]),
+        valid = assert(is_undef(value) || is_finite(value) || is_vector(value), "Invalid radius or diameter."),
         rad = !is_undef(r1) ?  r1 
             : !is_undef(d1) ?  d1/2
             : !is_undef(r2) ?  r2
@@ -734,7 +737,7 @@ function get_radius(r1, r2, r, d1, d2, d, dflt) =
             : !is_undef(d)  ?  d/2
             : dflt
     )
-    assert(is_undef(dflt) || is_finite(rad) || is_vector(rad), "Invalid radius." )
+    assert(is_undef(rad) || is_finite(rad) || is_vector(rad), "Invalid radius." )
     rad;
 
 
@@ -749,7 +752,7 @@ function get_radius(r1, r2, r, d1, d2, d, dflt) =
 //   same way that OpenSCAD expands short vectors in some contexts, e.g. cube(10) or rotate([45,90]).  
 //   If `v` is a scalar, and `dflt==undef`, returns `[v, v, v]`.
 //   If `v` is a scalar, and `dflt!=undef`, returns `[v, dflt, dflt]`.
-//   if `v` is a list of length 3 or more then returns `v`
+//   If `v` is a list of length 3 or more, returns its first three entries.
 //   If `v` is a list and dflt is defined, returns a length 3 list by padding with `dflt`
 //   If `v` is a list and dflt is undef, returns a length 3 list by padding with 0
 //   If `v` is `undef`, returns `undef`.
@@ -769,14 +772,25 @@ function scalar_vec3(v, dflt) =
     !is_undef(dflt)? [v,dflt,dflt] : [v,v,v];
 
 // Function: segs()
-// Synopsis: Returns the number of sides for a circle given `$fn`, `$fa`, and `$fs`.
+// Synopsis: Returns the number of sides for a circle given `$fn`, `$fe`, `$fa`, and `$fs`.
 // Topics: Geometry
 // See Also: circle(), cyl()
 // Usage:
 //   sides = segs(r, [angle]);
 // Description:
-//   Calculate the standard number of sides OpenSCAD would give a circle based on `$fn`, `$fa`, and `$fs`.
+//   Calculate the standard number of sides OpenSCAD would give a circle based on `$fn`, `$fe`, `$fa`, and `$fs`.
 //   If angle is given, calculate for an arc of the given angle.
+//   .
+//   `$fn`, if greater than zero, sets the number of sides directly, with a minimum of 3.
+//   Otherwise `$fe`, if set and greater than zero, gives the largest distance any side may stray from the
+//   true circle, and the circle gets just enough sides to stay within it, with a minimum of 5.  This keeps
+//   small and large circles equally smooth.  When `$fe` is used, `$fa` and `$fs` are ignored.
+//   Otherwise `$fa` and `$fs` set the largest angle and the longest length of a side, with a minimum of 5 sides.
+//   .
+//   `$fe` is supported by OpenSCAD when run with `--enable=discretization-by-error`, and by BelfrySCAD.
+//   It is not predefined, so anywhere it is not set, `segs()` uses `$fa` and `$fs` as before.
+//   If you set `$fe` in OpenSCAD without that option, `segs()` still uses it, but OpenSCAD's own
+//   `circle()`, `cylinder()` and `sphere()` ignore it, so the two will no longer agree.
 // Arguments:
 //   r = Radius of circle/arc to get the number of segments for.
 //   angle = Angle of arc to get the get the number of segments for.
@@ -784,11 +798,28 @@ function scalar_vec3(v, dflt) =
 //   $fn=12; sides=segs(10);           // Returns: 12
 //   $fa=2; $fs=3; sides=segs(10);     // Returns: 21
 //   $fa=2; $fs=3; sides=segs(10,180); // Returns: 11
+//   $fe=0.01; sides=segs(10);         // Returns: 71
+//   $fe=0.01; sides=segs(10,180);     // Returns: 36
 function segs(r,angle) =
-    is_def(angle) ? ceil(segs(r)*abs(angle)/360-2e-15)  // 2e-15 needed in case angle is slightly large due to rounding error
+    let( fe = _segs_fe() )
+    is_def(angle) ? ceil((fe>0 && $fn<=0 ? _segs_by_error(r,fe) : segs(r))*abs(angle)/360-2e-15)  // 2e-15 needed in case angle is slightly large due to rounding error
   : $fn>0? ($fn>3? $fn : 3)
+  : fe>0? ceil(_segs_by_error(r,fe))
   : let( r = is_finite(r)? r : 0 )
     ceil(max(5, min(360/$fa, abs(r)*2*PI/$fs)));
+
+
+// `$fe` if it is set to a usable value, otherwise 0.  `is_undef()` first, so an unset `$fe` is read without a warning.
+function _segs_fe() =
+    is_undef($fe) || !is_finite($fe) || $fe < 1/1048576 ? 0 : $fe;
+
+
+// Sides for a full circle of radius r whose sides stray at most fe from it, as OpenSCAD computes them.
+// Not rounded up, so that an arc is scaled from the exact count, as OpenSCAD does.
+function _segs_by_error(r,fe) =
+    let( r = is_finite(r)? abs(r) : 0 )
+    r==0 || fe/r >= 0.1909830056 ? 5
+  : min(max(5, min(360/0.01, 2*PI*r/0.01)), 180/acos(1-fe/r));
 
 
 // Module: no_children()
@@ -918,7 +949,7 @@ function _valstr(x) =
 //   Tests if the value gotten is what was expected, plus or minus 1e-9.  If not, then
 //   the expected and received values are printed to the console and
 //   an assertion is thrown to stop execution.
-//   Returns false if both 'got' and 'expected' are 'nan'.
+//   Fails when both inputs are NaN.
 // Arguments:
 //   got = The value actually received.
 //   expected = The value that was expected.
@@ -951,7 +982,7 @@ module assert_approx(got, expected, info) {
 // Description:
 //   Tests if the value gotten is what was expected.  If not, then the expected and received values
 //   are printed to the console and an assertion is thrown to stop execution.
-//   Returns true if both 'got' and 'expected' are 'nan'.
+//   Fails when both inputs are NaN.
 // Arguments:
 //   got = The value actually received.
 //   expected = The value that was expected.
@@ -1048,12 +1079,12 @@ module shape_compare(eps=1/1024) {
 //           looping(state);
 //           
 //           state = loop_while(state, i < len(l)),
-//           total = total +
+//           total = total + (
 //               loop_done(state) ? 0 :
 //               let( x = l[i] )
-//               is_list(x) ? flat_sum(x) : x,
+//               is_list(x) ? flat_sum(x) : x),
 //           i = i + 1
-//       ) if (loop_done(state)) total;
+//       ) if (loop_done(state)) total
 //   ].x;
 //   ```
 
